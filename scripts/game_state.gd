@@ -117,6 +117,9 @@ var greedy := false
 var spawn_depth_m := 0.0
 var test_keeper := 0
 var test_finale := ""
+## Set by the dive when it assembles; lets the finale place a death-net at
+## the iris in real dive-world coordinates.
+var dive_floor_y := 0.0
 var _fresh := false
 
 var _post_load_overrides: Array[Callable] = []
@@ -340,7 +343,8 @@ func record_death(pos: Vector2, salv: int, rel: int, depth_m: float, duration: f
 		pending_net = {
 			"x": pos.x, "y": pos.y,
 			"salvage": salv, "relics": rel,
-			"depth_m": depth_m,
+			# the net lies where you FELL, not at your deepest point
+			"depth_m": maxf(0.0, (pos.y - 24.0) / PX_PER_M),
 		}
 	last_result = {
 		"died": true,

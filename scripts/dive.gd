@@ -105,6 +105,7 @@ func _assemble_grid() -> void:
 			grid.append(row)
 			row_band.append(entry.band)
 	world_rows = grid.size()
+	Game.dive_floor_y = world_rows * TILE
 	_carve_seams()
 
 	# how deep the suit is rated to go

@@ -56,6 +56,9 @@ func _init() -> void:
 	check(game.salvage == before + 30 + 4, "stipend = 10% of 40")
 	check(game.pending_net.salvage == 40, "net holds salvage")
 	check(game.pending_net.relics == 1, "net holds relics")
+	check(absf(game.pending_net.depth_m - (900.0 - 24.0) / 8.0) < 0.01,
+			"net depth comes from where you fell, not max depth")
+	check(game.best_depth_m == 200.0, "best depth still tracks the deepest point")
 	check(game.last_result.died, "ledger says died")
 	var net = game.take_pending_net()
 	check(net.x == 500.0, "net position")

@@ -230,9 +230,12 @@ func _offer(hint: String, id: String) -> void:
 		_run_ending(id)
 
 func _on_player_died(_reason: String) -> void:
-	# death in the finale is not an ending: the line hauls you back wholesale
+	# death in the finale is not an ending: the line hauls you back wholesale.
+	# Any dropped net snags at the iris — real dive-world coordinates, not
+	# this scene's own map.
 	Sfx.play("death")
-	Game.record_death(player.global_position, player.carried_salvage(),
+	var net_pos := Vector2(Chunks.COLS * TILE / 2.0, maxf(Game.dive_floor_y - 96.0, 400.0))
+	Game.record_death(net_pos, player.carried_salvage(),
 			player.carried_relics(), max_depth_m, 0.0,
 			"The floor of the Throat kept its counsel. The line dragged you home.")
 	get_tree().create_timer(1.6).timeout.connect(func() -> void:
