@@ -1,13 +1,16 @@
-# LIGHTLINE — alpha
+# LIGHTLINE — beta
 
 A descent roguelite: you are a salvage diver tethered to a derelict lighthouse.
 The tether is your oxygen, your light, and your way home — and everything you
 pick up dims it. See `lightline-design-document.md` for the full design.
 
-This build is the **alpha** from §10 of the design doc: Bands 1–3 (the
-Shallows, the Middens, the Cathedral), the ability system, bestiary scan
-passives, the first Keeper bosses gating suit tiers, and Marlowe's logs 1–15 —
-on top of the vertical slice's banking/death rules and corpse run.
+This build is the **beta** from §10 of the design doc: all five bands (the
+Shallows, the Middens, the Cathedral, the Gardens, the Throat), four Keeper
+bosses gating five suit tiers, the Warden stalking every Throat dive, the
+authored finale with its three endings, assist options, and a full audio pass
+(per-band music, hub and finale themes, ending stings) — on top of the
+abilities, bestiary passives, 24 of Marlowe's logs, banking/death rules, and
+the corpse run.
 
 ## Run it
 
@@ -54,17 +57,28 @@ Godot editor does the same thing automatically.
 - **The Middens** (band 2): currents, pipe eels, and the Lanternjaw's false
   light. **The Cathedral** (band 3): darkness pockets your beam can't pierce
   and the blind, sound-hunting Choir — move like silt settles, or kill your
-  light entirely (F).
-- 15 of **Marlowe's logs** are scattered across the bands; each teaches a
+  light entirely (F). **The Gardens** (band 4): wick lice that drink the line
+  (dash them off, or burn a flare) and carnivorous blooms that open for
+  flares. **The Throat** (band 5): gravity wells, crushing timers — and the
+  Warden, which cannot be fought, only evaded, and which sees your lit lamp
+  from very far away.
+- 24 of **Marlowe's logs** are scattered across the bands; each teaches a
   real technique, and together they say what she was actually doing down
   there. Replay them in the Archive tab.
+- With Suit V fitted, an iris waits in the floor of the Throat. Below it: a
+  fixed, authored final descent and a **genuine choice** with three endings.
+  The hub remembers which one you made — and the floor will let you choose
+  differently.
+- **Assists** (Settings tab): Lightline drain −25/−50%, panic off, gentle
+  fauna. No content is locked behind difficulty. The Choir's song always
+  draws visible rings — sound is never the only cue.
 
 Saves live in `~/Library/Application Support/Lightline/`.
 
 ## Development
 
-- `tools/gen_art.py` + `tools/gen_art_alpha.py`, `tools/gen_sfx.py` +
-  `tools/gen_sfx_alpha.py` — regenerate all pixel art / SFX (Python 3 + Pillow).
+- `tools/gen_art*.py`, `tools/gen_sfx*.py` — regenerate all pixel art, SFX,
+  and music loops (Python 3 + Pillow).
 - `godot --headless --path . -s tests/test_logic.gd` — economy/progression
   logic tests.
 - Debug flags (after `--`): `--fresh` (wipe save), `--autodive` (autopilot
@@ -72,4 +86,5 @@ Saves live in `~/Library/Application Support/Lightline/`.
   `--shot=path.png --shot-delay=S` (dive screenshot), `--shot-hub=path.png`
   (hub screenshot), `--suit=N`, `--relics=N`, `--stat=lungs:10`,
   `--ability=sonar:3`, `--scan-all`, `--spawn-depth=M`, `--test-keeper=N`
-  (autopilot fights Keeper N).
+  (autopilot fights Keeper N), `--test-finale=relight|cut|descend` (autopilot
+  plays the finale to that ending).

@@ -19,7 +19,42 @@ func _init(p: Player) -> void:
 func dir(delta: float) -> Vector2:
 	if player.auto_mode == "fight":
 		return _fight(delta)
+	if player.auto_mode == "finale":
+		return _finale(delta)
 	return _loot(delta)
+
+# ---------- finale ----------
+func _finale(delta: float) -> Vector2:
+	# same corner-blundering escape the fight bot uses
+	_stuck_t = _stuck_t + delta if player.velocity.length() < 14.0 else 0.0
+	if _unstick_until > 0.0:
+		_unstick_until -= delta
+		return _unstick_dir
+	if _stuck_t > 1.2:
+		_stuck_t = 0.0
+		_unstick_until = 0.55
+		_unstick_dir = Vector2(randf_range(-1, 1), randf_range(-0.4, 1)).normalized()
+		return _unstick_dir
+	if _valve_pressed:
+		Input.action_release("interact")
+		_valve_pressed = false
+	var finale := player.get_parent()
+	var target: Vector2
+	match Game.test_finale:
+		"cut":
+			target = finale.line_pos
+		"relight":
+			target = finale.anchor_pos
+		_:
+			target = finale.maw_pos
+	if target == Vector2.ZERO:
+		return Vector2(0, 1)
+	var to_target := target - player.global_position
+	if to_target.length() < 40.0 and Game.test_finale in ["cut", "relight"]:
+		Input.action_press("interact")
+		_valve_pressed = true
+		return to_target.normalized() * 0.3
+	return to_target.normalized()
 
 # ---------- loot ----------
 func _loot(delta: float) -> Vector2:
@@ -108,6 +143,10 @@ func _fight(delta: float) -> Vector2:
 			prop = s
 	if prop == null:
 		var dive := player.get_parent()
+		# the Gardener's blooms answer to a flare
+		if dive.valves.is_empty() and Game.ability_rank("flare") > 0 \
+				and player.ability_cd.get("flare", 0.0) <= 0.0 and "flare" in Game.equipped:
+			player.use_ability(Game.equipped.find("flare"))
 		if not dive.valves.is_empty():
 			var valve: Node2D = null
 			var vd := 1e12

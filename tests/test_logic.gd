@@ -110,12 +110,55 @@ func _init() -> void:
 		game.record_log(id)
 	check(game.next_log_for_band(3) == -1, "band 3 exhausts")
 
+	print("-- suits IV and V --")
+	game.suit_tier = 3
+	game.record_keeper(3)
+	game.record_keeper(4)
+	game.relics = 30
+	check(game.can_buy_suit(4), "suit IV purchasable with core 3")
+	check(game.buy_suit(4), "suit IV fitted")
+	check(game.can_buy_suit(5), "suit V purchasable with core 4")
+	check(game.buy_suit(5), "suit V fitted")
+	check(not game.SUIT_TIERS.has(6), "no suit VI")
+
+	print("-- assists --")
+	check(game.drain_scale() == 1.0, "drain assist off by default")
+	game.settings.drain_assist = 2
+	check(game.drain_scale() == 0.5, "drain assist -50%")
+	game.settings.drain_assist = 0
+	check(game.fauna_speed_scale() == 1.0, "fauna full speed by default")
+	game.settings.gentle_fauna = true
+	check(game.fauna_speed_scale() == 0.7, "gentle fauna 30% slower")
+	game.settings.gentle_fauna = false
+	game.settings.panic_off = true
+	check(game.panic_gain_scale() == 0.0, "panic off zeroes panic gain")
+	game.settings.panic_off = false
+
+	print("-- endings --")
+	check(game.endings_seen.is_empty(), "no endings at start")
+	game.record_ending("cut")
+	game.record_ending("cut")
+	check(game.endings_seen == ["cut"], "ending dedup")
+	check(game.last_ending == "cut", "epilogue tracks last ending")
+	game.record_ending("relight")
+	check(game.endings_seen.size() == 2, "second ending recorded")
+
+	print("-- beta logs --")
+	check(game.next_log_for_band(4) == 16, "band 4 starts at log 16")
+	check(game.next_log_for_band(5) == 21, "band 5 starts at log 21")
+	for id in range(16, 25):
+		check(Logs.ENTRIES.has(id), "log %d exists" % id)
+
 	print("-- hint --")
-	check(game.next_goal_hint().length() > 10, "hint is a sentence")
+	game.endings_seen = []
+	check("floor of the Throat" in game.next_goal_hint(), "suit V hint points at the finale")
+	game.endings_seen = ["cut"]
+	check("choose differently" in game.next_goal_hint(), "post-ending hint invites replay")
 	game.relics = 0
 	game.suit_tier = 1
 	game.keepers_defeated = []
 	game.cores = []
+	game.endings_seen = []
 	check("guards the floor" in game.next_goal_hint(), "hint points at the keeper")
 	game.cores = [1]
 	check("core" in game.next_goal_hint(), "hint points at held core")

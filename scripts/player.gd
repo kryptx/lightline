@@ -30,6 +30,9 @@ var dark_pockets := 0        # inside N darkness pockets (beam suppressed)
 var scan_species := ""       # current scan target
 var scan_progress := 0.0
 var ability_cd := {"sonar": 0.0, "flare": 0.0, "anchor": 0.0}
+# beta systems
+var parasites := 0           # wick lice currently drinking the line
+var can_reel := true         # the finale's line is too taut to reel
 
 var auto_mode := "loot"
 
@@ -140,8 +143,9 @@ func weight_factor() -> float:
 		f += 1.3 * (w - cap) / cap
 	return f
 
+## Assist scaling is applied here so the HUD's return budget stays honest.
 func drain_rate() -> float:
-	return weight_factor()
+	return weight_factor() * Game.drain_scale()
 
 func depth_m() -> float:
 	return maxf(0.0, (global_position.y - surface_y) / Game.PX_PER_M)
@@ -166,7 +170,7 @@ func hurt(from_pos: Vector2, cost: float = HURT_LIGHT_COST, species := "") -> vo
 	if species == "urchin" and Game.has_scan("urchin"):
 		cost *= 0.5
 	_iframes = 0.9
-	light -= cost
+	light -= cost * Game.drain_scale()
 	panic = minf(1.0, panic + 0.55 * Game.panic_gain_scale())
 	velocity += (global_position - from_pos).normalized() * 240.0
 	Sfx.play("hurt")
@@ -183,12 +187,12 @@ func _physics_process(delta: float) -> void:
 	_iframes = maxf(0.0, _iframes - delta)
 
 	var dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	reeling = Input.is_action_pressed("tether")
+	reeling = Input.is_action_pressed("tether") and can_reel
 	if autopilot:
 		if _pilot == null:
 			_pilot = Autopilot.new(self)
 		dir = _pilot.dir(delta)
-		reeling = _pilot.reel
+		reeling = _pilot.reel and can_reel
 
 	# momentum swimming: constant drag, input acceleration, soft cap.
 	# The cap bleeds off gradually so dash bursts genuinely carry speed.

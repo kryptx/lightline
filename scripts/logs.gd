@@ -7,6 +7,8 @@ const BAND_LOGS := {
 	1: [1, 2, 3, 4, 5, 6],
 	2: [7, 8, 9, 10, 11],
 	3: [12, 13, 14, 15],
+	4: [16, 17, 18, 19, 20],
+	5: [21, 22, 23, 24],
 }
 
 const ENTRIES := {
@@ -69,5 +71,41 @@ const ENTRIES := {
 	15: {
 		"title": "Log 15 — What I Actually Do Here",
 		"text": "Let me be plain, whoever you are. I was never salvaging. The lighthouse ledger says 'recovered goods'; the truth is the goods go DOWN. I feed it. I have fed it for years, and it has let me keep this little circle of light in exchange. The cantor in the deep nave keeps the tally, and the pipes crack like bone when he strikes them — remember that, if you ever have to face him. I'm going to stop feeding it. Tomorrow. — M.",
+	},
+	16: {
+		"title": "Log 16 — The Gardens",
+		"text": "Below the nave the trench blooms. A reef with no sun, lit by its own appetite. It's beautiful the way a lure is beautiful — I know that now, and I still can't stop looking. Everything down here glows because everything down here is hungry.",
+	},
+	17: {
+		"title": "Log 17 — Wick Lice",
+		"text": "The little lights that drift toward you are not curious. They are thirsty. They land on the suit and put their mouths to the line and DRINK. Kick hard and they scatter. Better: strike a flare and drop it — they'd rather drink from a bonfire than a wick. Watch them stream away from you like sparks going home.",
+	},
+	18: {
+		"title": "Log 18 — The Blooms",
+		"text": "The great flowers open and close on their own slow heartbeat. Inside the petals: teeth, of a sort. Anything charging through an open bloom comes out the other side wearing less of itself. They open FOR a flare, immediately, like dogs hearing the dinner bell. The brute that gardens this reef has learned to walk around them. Make it forget.",
+	},
+	19: {
+		"title": "Log 19 — What the Lamp Is",
+		"text": "I went through the first keeper's ledgers tonight, the real ones, from before the light was automated. There are no shipping lanes out here. There have never been shipping lanes out here. The lamp was never for ships. Column after column in a hand I don't know: FED, HELD. FED, HELD. The lamp isn't a warning. It's a LEASH — and I can't find where it's anchored, except that the anchor is down, down, down.",
+	},
+	20: {
+		"title": "Log 20 — The Gardener",
+		"text": "The reef-brute wears the blooms like a crown and tends them like children, and it will not let me pass the root-gate. Fine. I've seen it blunder: it charges what shines, and it cannot stop itself mid-charge. A flare in the right flower at the right moment... I got the gate open. I wish I hadn't. The water past it goes down like a throat swallows.",
+	},
+	21: {
+		"title": "Log 21 — The Throat",
+		"text": "No color down here. The water has weight, has PULL — there are places it coils around you like a fist closing, and you must swim the rim, never the eye. When the walls groan, get to stone and hold: the deep clenches on a slow count, and what it catches in the open, it keeps. Count the pulse. Move between clenches.",
+	},
+	22: {
+		"title": "Log 22 — It Can See the Line",
+		"text": "Something walks these depths that the fish will not name. I've never seen its body. I've seen its EYES, and the eyes were looking at my tether. Do you understand? Not at me — at the LINE. My light runs up to the lamp like a vein of gold in black rock, and to the thing down here it must look like exactly that. Kill your lamp and drift, and you're just another cold current. Shine, and you are a road drawn straight to your own heart.",
+	},
+	23: {
+		"title": "Log 23 — The Warden",
+		"text": "I call it the Warden because it patrols. It doesn't feed the way the little ones feed — it HERDS. It has driven me off the floor three times, always toward the lamp, always up. The leash isn't for it. The leash is for US, and the Warden minds the yard. It can be outlasted: it strikes, withdraws, circles. Douse, drift, count its heartbeat. And never, never reel while it watches — the line sings when it's taut, and it comes to the song.",
+	},
+	24: {
+		"title": "Log 24 — Three Ways Down",
+		"text": "I've reached the floor. There's a chamber under everything where my line runs into the dark and does not come back out, and the old lamp-anchor squats there rusting, and below both there is a mouth that is patient the way only the very large are patient. Three things a person could do here. Light the anchor and give it back its leash. Cut the line and see what a lighthouse dies into. Or go down — all the way, lamp and all — and ask it what it actually wants. I have stood here for an hour. Whoever finds this: I chose. Come and see what it cost. — M.",
 	},
 }

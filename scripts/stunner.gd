@@ -4,11 +4,15 @@ extends Node2D
 ## - "anemone": always armed; consumed on use, regrows after a while
 ## - "vent": armed for a few seconds after its valve is opened
 ## - "pipe": always armed; consumed on use, resonates back after a while
+## - "bloom": opens/closes on its own slow heartbeat; a flare nearby snaps it
+##   open at once. Armed only while open.
 
 var kind := "anemone"
 var armed := true
 var stun_radius := 16.0
 var _regrow := 0.0
+var _bloom_t := 0.0
+var _bloom_open := false
 var sprite: AnimatedSprite2D
 var static_sprite: Sprite2D
 var particles: CPUParticles2D
@@ -32,6 +36,31 @@ func _ready() -> void:
 			static_sprite.texture = load("res://assets/organ_pipe.png")
 			add_child(static_sprite)
 			stun_radius = 20.0
+		"bloom":
+			sprite = AnimatedSprite2D.new()
+			var sf := SpriteFrames.new()
+			sf.remove_animation("default")
+			sf.add_animation("closed")
+			sf.add_animation("open")
+			var tex: Texture2D = load("res://assets/bloom.png")
+			for i in range(2):
+				var at_tex := AtlasTexture.new()
+				at_tex.atlas = tex
+				at_tex.region = Rect2(i * 26, 0, 26, 26)
+				sf.add_frame(["closed", "open"][i], at_tex)
+			sprite.sprite_frames = sf
+			sprite.play("closed")
+			add_child(sprite)
+			var glow := PointLight2D.new()
+			glow.texture = load("res://assets/halo.png")
+			glow.scale = Vector2(0.22, 0.22)
+			glow.energy = 0.0
+			glow.color = Color(1.0, 0.75, 0.55)
+			glow.name = "Glow"
+			add_child(glow)
+			armed = false
+			stun_radius = 17.0
+			_bloom_t = randf_range(0.0, 5.0)
 		"vent":
 			armed = false
 			stun_radius = 24.0
@@ -57,6 +86,10 @@ func arm_vent(duration: float) -> void:
 func consume() -> void:
 	if kind == "vent":
 		return  # vents stay live until their timer ends
+	if kind == "bloom":
+		_set_bloom(false)
+		_bloom_t = 6.0  # dazed shut for a while
+		return
 	armed = false
 	_regrow = 16.0
 	if sprite:
@@ -64,7 +97,31 @@ func consume() -> void:
 	if static_sprite:
 		static_sprite.modulate.a = 0.25
 
+func _set_bloom(open: bool) -> void:
+	_bloom_open = open
+	armed = open
+	sprite.play("open" if open else "closed")
+	(get_node("Glow") as PointLight2D).energy = 0.6 if open else 0.0
+	if open:
+		Sfx.play("bloom", -10.0)
+
 func _process(delta: float) -> void:
+	if kind == "bloom":
+		# a flare nearby forces it open at once
+		var flared := false
+		for f in get_tree().get_nodes_in_group("flares"):
+			if position.distance_to((f as Node2D).global_position) < 130.0:
+				flared = true
+				break
+		if flared and not _bloom_open:
+			_set_bloom(true)
+			_bloom_t = 6.0
+			return
+		_bloom_t -= delta
+		if _bloom_t <= 0.0:
+			_set_bloom(not _bloom_open)
+			_bloom_t = 4.0 if _bloom_open else 5.5
+		return
 	if _regrow > 0.0:
 		_regrow -= delta
 		if _regrow <= 0.0:

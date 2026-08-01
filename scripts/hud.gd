@@ -322,23 +322,40 @@ func _process(_delta: float) -> void:
 
 	cargo_label.text = "Cargo  %d salvage   %d relics" % [player.carried_salvage(), player.carried_relics()]
 
-	var cost := player.return_cost_s()
-	return_label.text = "Return budget  ≈%ds of light" % int(ceil(cost))
-	if cost > player.light:
-		return_label.text += "   — TOO DEEP, SHED WEIGHT"
-		return_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.25))
-	elif cost > player.light * 0.6:
+	if not player.can_reel:
+		return_label.text = "The line only goes down now."
 		return_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.4))
 	else:
-		return_label.add_theme_color_override("font_color", Color(0.75, 0.95, 0.85))
+		var cost := player.return_cost_s()
+		return_label.text = "Return budget  ≈%ds of light" % int(ceil(cost))
+		if cost > player.light:
+			return_label.text += "   — TOO DEEP, SHED WEIGHT"
+			return_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.25))
+		elif cost > player.light * 0.6:
+			return_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.4))
+		else:
+			return_label.add_theme_color_override("font_color", Color(0.75, 0.95, 0.85))
+
+	# wick lice on the line
+	if player.parasites > 0:
+		weight_label.text += "   ·   %d wick %s drinking — dash!" % [
+			player.parasites, "louse" if player.parasites == 1 else "lice"]
 
 	suit_label.text = "Suit %s   ·   %s" % [
-		["", "I", "II", "III"][Game.suit_tier],
+		["", "I", "II", "III", "IV", "V"][Game.suit_tier],
 		Game.BANDS[dive.current_band].name.capitalize()]
 
-	# panic + dying light close in on the screen
+	# panic + dying light close in on the screen; the Warden reddens it
 	var low_light := clampf(1.0 - player.light / 20.0, 0.0, 1.0)
 	vignette.modulate.a = clampf(player.panic * 0.85 + low_light * 0.55, 0.0, 1.0)
+	var dread := 0.0
+	for warden_node in get_tree().get_nodes_in_group("warden"):
+		var sense: float = 420.0 * (2.0 if Game.has_scan("warden") else 1.0)
+		var d: float = player.global_position.distance_to((warden_node as Node2D).global_position)
+		dread = maxf(dread, clampf(1.0 - d / sense, 0.0, 1.0))
+	vignette.modulate = Color(1.0, 1.0 - dread * 0.6, 1.0 - dread * 0.6, vignette.modulate.a)
+	if dread > 0.0:
+		vignette.modulate.a = maxf(vignette.modulate.a, dread * 0.5 + sin(Time.get_ticks_msec() / 300.0) * 0.06)
 
 	# scanning readout
 	if player.scan_species != "":

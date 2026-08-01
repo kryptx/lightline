@@ -21,6 +21,9 @@ const CONFIG := {
 	3: {"sheet": "keeper_cantor.png", "w": 40, "h": 60, "hp": 3,
 		"charge_speed": 380.0, "idle_speed": 34.0, "target": "noise",
 		"name": "THE CANTOR", "radius": 22.0},
+	4: {"sheet": "keeper_gardener.png", "w": 60, "h": 56, "hp": 3,
+		"charge_speed": 330.0, "idle_speed": 42.0, "target": "player",
+		"name": "THE GARDENER", "radius": 26.0},
 }
 
 var id := 1
@@ -102,7 +105,7 @@ func _process(delta: float) -> void:
 			# leashed to its arena: stalks the intruder inside, guards otherwise
 			var player_in_arena := arena.grow(60.0).has_point(player.global_position)
 			var target := player.global_position if player_in_arena else arena.get_center()
-			var desired: Vector2 = (target - position).normalized() * CONFIG[id].idle_speed
+			var desired: Vector2 = (target - position).normalized() * CONFIG[id].idle_speed * Game.fauna_speed_scale()
 			if position.distance_to(target) < 30.0:
 				desired = Vector2.ZERO
 			_vel = _vel.lerp(desired, 1.0 - exp(-1.6 * delta))
@@ -127,7 +130,7 @@ func _process(delta: float) -> void:
 				_set_state("charge")
 				_timer = 1.5
 		"charge":
-			position += _charge_dir * CONFIG[id].charge_speed * delta
+			position += _charge_dir * CONFIG[id].charge_speed * Game.fauna_speed_scale() * delta
 			sprite.flip_h = _charge_dir.x < 0.0
 			# armed stunner in the path?
 			for prop in get_tree().get_nodes_in_group("stunners"):

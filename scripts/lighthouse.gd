@@ -39,6 +39,11 @@ func _ready() -> void:
 	_refresh()
 
 	Engine.time_scale = 1.0
+	Sfx.play_music("music_hub")
+	if Game.test_finale != "":
+		get_tree().create_timer(0.4).timeout.connect(func() -> void:
+			get_tree().change_scene_to_file("res://scenes/Finale.tscn"))
+		return
 	if Game.shot_hub_path != "" and (Game.dive_count > 0 or not Game.autoplay):
 		var timer := get_tree().create_timer(1.2)
 		timer.timeout.connect(func() -> void:
@@ -79,6 +84,17 @@ func _build_panel() -> void:
 	title.add_theme_font_size_override("font_size", 28)
 	title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.6))
 	box.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = {
+		"": "The lighthouse holds. The trench waits.",
+		"relight": "The lamp burns steady. The ledger is balanced. FED. HELD.",
+		"cut": "The tower is only a tower now. The sea is only the sea.",
+		"descend": "The lamp keeps itself lit these days. Its keeper is elsewhere.",
+	}[Game.last_ending]
+	subtitle.add_theme_font_size_override("font_size", 12)
+	subtitle.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	box.add_child(subtitle)
 
 	var currencies := HBoxContainer.new()
 	currencies.add_theme_constant_override("separation", 18)
@@ -135,6 +151,16 @@ func _build_panel() -> void:
 	archive_box.add_theme_constant_override("separation", 5)
 	archive_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	archive_scroll.add_child(archive_box)
+
+	# --- Settings tab (assists + audio; §7: nothing is locked behind them) ---
+	var settings_scroll := ScrollContainer.new()
+	settings_scroll.name = "Settings"
+	tabs.add_child(settings_scroll)
+	var settings_box := VBoxContainer.new()
+	settings_box.add_theme_constant_override("separation", 8)
+	settings_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_scroll.add_child(settings_box)
+	_build_settings(settings_box)
 
 	net_label = _label(box, 12, Color(1.0, 0.7, 0.5))
 	net_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -196,13 +222,86 @@ func _label(parent: Control, size: int, color: Color) -> Label:
 	parent.add_child(l)
 	return l
 
+# ---------- settings ----------
+func _build_settings(box: VBoxContainer) -> void:
+	_label(box, 15, Color(0.9, 0.9, 0.95)).text = "ASSISTS — the dive bends, the game stays whole"
+
+	var drain_row := HBoxContainer.new()
+	drain_row.add_theme_constant_override("separation", 8)
+	box.add_child(drain_row)
+	var drain_label := _label(drain_row, 13, Color(1, 1, 1))
+	drain_label.text = "Lightline drain"
+	drain_label.custom_minimum_size = Vector2(150, 0)
+	var drain_group := ButtonGroup.new()
+	for i in range(3):
+		var b := Button.new()
+		b.toggle_mode = true
+		b.button_group = drain_group
+		b.text = ["Full", "-25%", "-50%"][i]
+		b.add_theme_font_size_override("font_size", 12)
+		b.button_pressed = int(Game.settings.drain_assist) == i
+		var level := i
+		b.pressed.connect(func() -> void:
+			Game.settings.drain_assist = level
+			Game.save_game()
+			Sfx.play("ui"))
+		drain_row.add_child(b)
+
+	var panic_check := CheckButton.new()
+	panic_check.text = "Panic off — creatures no longer narrow your sight"
+	panic_check.add_theme_font_size_override("font_size", 13)
+	panic_check.button_pressed = Game.settings.panic_off
+	panic_check.toggled.connect(func(on: bool) -> void:
+		Game.settings.panic_off = on
+		Game.save_game()
+		Sfx.play("ui"))
+	box.add_child(panic_check)
+
+	var fauna_check := CheckButton.new()
+	fauna_check.text = "Gentle fauna — predators move and strike 30% slower"
+	fauna_check.add_theme_font_size_override("font_size", 13)
+	fauna_check.button_pressed = Game.settings.gentle_fauna
+	fauna_check.toggled.connect(func(on: bool) -> void:
+		Game.settings.gentle_fauna = on
+		Game.save_game()
+		Sfx.play("ui"))
+	box.add_child(fauna_check)
+
+	box.add_child(HSeparator.new())
+	_label(box, 15, Color(0.9, 0.9, 0.95)).text = "AUDIO"
+	for entry in [["Master", "vol_master"], ["Music", "vol_music"], ["Effects", "vol_sfx"]]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		box.add_child(row)
+		var slider_label := _label(row, 13, Color(1, 1, 1))
+		slider_label.text = entry[0]
+		slider_label.custom_minimum_size = Vector2(150, 0)
+		var slider := HSlider.new()
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.05
+		slider.value = float(Game.settings[entry[1]])
+		slider.custom_minimum_size = Vector2(200, 20)
+		var key: String = entry[1]
+		slider.value_changed.connect(func(v: float) -> void:
+			Game.settings[key] = v
+			Sfx.apply_volumes()
+			Game.save_game())
+		row.add_child(slider)
+
+	var note := _label(box, 11, Color(0.7, 0.75, 0.85))
+	note.text = "The Choir's song always draws visible rings — sound is never the only cue."
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
 # ---------- suit & gear ----------
 func _rebuild_gear() -> void:
 	for child in gear_box.get_children():
 		child.queue_free()
 
 	var suit_title := _label(gear_box, 15, Color(0.9, 0.9, 0.95))
-	var tier_names := {1: "Suit I — Shallows-rated", 2: "Suit II — Middens-rated", 3: "Suit III — Cathedral-rated"}
+	var tier_names := {1: "Suit I — Shallows-rated", 2: "Suit II — Middens-rated",
+			3: "Suit III — Cathedral-rated", 4: "Suit IV — Gardens-rated",
+			5: "Suit V — Throat-rated"}
 	suit_title.text = "⛑ %s" % tier_names[Game.suit_tier]
 
 	var next_tier := Game.suit_tier + 1
@@ -222,7 +321,7 @@ func _rebuild_gear() -> void:
 				_refresh())
 		gear_box.add_child(buy)
 	else:
-		_label(gear_box, 12, Color(0.7, 0.75, 0.85)).text = "The suit is rated for every charted depth. (The Gardens lie beyond the alpha.)"
+		_label(gear_box, 12, Color(0.7, 0.75, 0.85)).text = "The suit is rated for every depth on the chart — including the one at the bottom with no number."
 
 	gear_box.add_child(HSeparator.new())
 	_label(gear_box, 15, Color(0.9, 0.9, 0.95)).text = "ABILITIES — paid in relics, two equipped (Q / R)"

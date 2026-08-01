@@ -70,7 +70,7 @@ func _process(delta: float) -> void:
 				if absf(to_p.y) < 26.0 and to_p.x * facing > 0 and absf(to_p.x) < 78.0:
 					_state = "coil"
 					# the scanned eel telegraphs half again as long
-					_timer = 0.85 if Game.has_scan(species) else 0.55
+					_timer = (0.85 if Game.has_scan(species) else 0.55) / Game.fauna_speed_scale()
 					sprite.play("coil")
 		"coil":
 			if _timer <= 0.0:

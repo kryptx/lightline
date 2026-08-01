@@ -1,6 +1,7 @@
 extends Node2D
-## A dive: assembles Bands 1–3 from authored chunks, runs the loop, resolves
-## banking or death, and manages corpse net, keepers, logs, and the anchor.
+## A dive: assembles Bands 1–5 from authored chunks, runs the loop, resolves
+## banking or death, and manages corpse net, keepers, logs, the anchor, the
+## Warden, and the way down to the finale.
 
 const TILE := 32
 const WORLD_COLS := Chunks.COLS
@@ -44,6 +45,7 @@ func _ready() -> void:
 	hud.setup(player, self)
 	add_child(hud)
 	Sfx.start_ambience()
+	Sfx.play_music("music_band%d" % row_band[clampi(int(player.position.y / TILE), 0, world_rows - 1)])
 	Sfx.play("splash", -4.0)
 	if Game.autoplay:
 		player.autopilot = true
@@ -64,10 +66,14 @@ func _assemble_grid() -> void:
 	var lower := Chunks.LOWER.duplicate()
 	var band2 := Chunks.BAND2.duplicate()
 	var band3 := Chunks.BAND3.duplicate()
+	var band4 := Chunks.BAND4.duplicate()
+	var band5 := Chunks.BAND5.duplicate()
 	_shuffle(upper)
 	_shuffle(lower)
 	_shuffle(band2)
 	_shuffle(band3)
+	_shuffle(band4)
+	_shuffle(band5)
 
 	var stack: Array = []
 	stack.append({"rows": Chunks.SURFACE, "band": 1, "mirror": false})
@@ -82,7 +88,12 @@ func _assemble_grid() -> void:
 	for i in range(4):
 		stack.append({"rows": band3[i % band3.size()], "band": 3, "mirror": true})
 	stack.append({"rows": Chunks.ARENA3, "band": 3, "mirror": false})
-	stack.append({"rows": Chunks.FLOOR3, "band": 3, "mirror": false})
+	for i in range(4):
+		stack.append({"rows": band4[i % band4.size()], "band": 4, "mirror": true})
+	stack.append({"rows": Chunks.ARENA4, "band": 4, "mirror": false})
+	for i in range(3):
+		stack.append({"rows": band5[i % band5.size()], "band": 5, "mirror": true})
+	stack.append({"rows": Chunks.FLOOR5, "band": 5, "mirror": false})
 
 	for entry in stack:
 		var mirror: bool = entry.mirror and rng.randf() < 0.5
@@ -134,86 +145,19 @@ func _carve_seams() -> void:
 				grid[bottom_row] = grid[bottom_row].substr(0, c) + "." + grid[bottom_row].substr(c + 1)
 
 func _build_backdrop() -> void:
-	var world_h := world_rows * TILE
-	var bg := Sprite2D.new()
-	bg.texture = load("res://assets/water_gradient.png")
-	bg.centered = false
-	bg.scale = Vector2(WORLD_COLS * TILE / 16.0, (world_h + 400) / 1024.0)
-	bg.z_index = -20
-	add_child(bg)
-	var sky := ColorRect.new()
-	sky.color = Color(0.09, 0.06, 0.16)
-	sky.position = Vector2(-200, -420)
-	sky.size = Vector2(WORLD_COLS * TILE + 400, 420 + SURFACE_Y - 8)
-	sky.z_index = -19
-	add_child(sky)
-	var surf_tex: Texture2D = load("res://assets/surface.png")
-	for i in range(WORLD_COLS * TILE / 64 + 1):
-		var s := Sprite2D.new()
-		s.texture = surf_tex
-		s.centered = false
-		s.position = Vector2(i * 64, SURFACE_Y - 8)
-		s.z_index = -18
-		add_child(s)
-	var cm := CanvasModulate.new()
-	cm.color = Color(0.055, 0.075, 0.13)
-	add_child(cm)
-	var sun := PointLight2D.new()
-	sun.texture = load("res://assets/halo.png")
-	sun.position = Vector2(WORLD_COLS * TILE / 2.0, -160)
-	sun.scale = Vector2(9, 4.5)
-	sun.energy = 0.75
-	sun.color = Color(0.8, 0.76, 0.88)
-	add_child(sun)
+	Worldgen.build_backdrop(self, world_rows, WORLD_COLS, true)
 
 func _build_tiles_and_collision() -> void:
-	var tiles := TileMapLayer.new()
-	var ts := TileSet.new()
-	ts.tile_size = Vector2i(TILE, TILE)
-	var sheets := ["rock_tiles.png", "town_tiles.png", "cathedral_tiles.png"]
-	for si in range(3):
-		var src := TileSetAtlasSource.new()
-		src.texture = load("res://assets/" + sheets[si])
-		src.texture_region_size = Vector2i(TILE, TILE)
-		for i in range(4):
-			src.create_tile(Vector2i(i, 0))
-		ts.add_source(src, si)
-	tiles.tile_set = ts
-	tiles.z_index = 0
-	add_child(tiles)
-
-	var body := StaticBody2D.new()
-	body.collision_layer = 1
-	add_child(body)
-
+	var row_source: Array[int] = []
 	for r in range(world_rows):
-		var source := row_band[r] - 1
-		var run_start := -1
-		for c in range(WORLD_COLS + 1):
-			var solid: bool = c < WORLD_COLS and grid[r][c] == "#"
-			if solid:
-				var open_above: bool = r > 0 and _is_open(grid[r - 1][c])
-				var variant := 1 if open_above else (0 if (c * 7 + r * 13) % 3 != 0 else 2)
-				if open_above and (c + r) % 5 == 0:
-					variant = 3
-				tiles.set_cell(Vector2i(c, r), source, Vector2i(variant, 0))
-				if run_start < 0:
-					run_start = c
-			elif run_start >= 0:
-				var shape := CollisionShape2D.new()
-				var rect := RectangleShape2D.new()
-				var width := (c - run_start) * TILE
-				rect.size = Vector2(width, TILE)
-				shape.shape = rect
-				shape.position = Vector2(run_start * TILE + width / 2.0, r * TILE + TILE / 2.0)
-				body.add_child(shape)
-				run_start = -1
+		row_source.append(row_band[r] - 1)
+	Worldgen.build_tiles_and_collision(self, grid, row_source)
 
 func _spawn_player() -> void:
 	player = Player.new()
 	player.position = Vector2(WORLD_COLS * TILE / 2.0, 56)
 	if Game.test_keeper > 0:
-		Game.spawn_depth_m = {1: 380.0, 2: 682.0, 3: 982.0}[Game.test_keeper]
+		Game.spawn_depth_m = {1: 380.0, 2: 682.0, 3: 982.0, 4: 1290.0}[Game.test_keeper]
 	if Game.spawn_depth_m > 0.0:
 		player.position.y = Game.spawn_depth_m * Game.PX_PER_M
 		player.position = _nearest_open(player.position)
@@ -240,7 +184,7 @@ func _cell_pos(c: int, r: int) -> Vector2:
 
 func _spawn_entities() -> void:
 	var species := ["fish_teal", "fish_rose"]
-	var log_cells := {1: [], 2: [], 3: []}
+	var log_cells := {1: [], 2: [], 3: [], 4: [], 5: []}
 	var arena_index := {}  # keeper id -> chunk start row
 	for r in range(world_rows):
 		var band := row_band[r]
@@ -301,6 +245,16 @@ func _spawn_entities() -> void:
 					add_child(Stunner.make("anemone", pos))
 				"P":
 					add_child(Stunner.make("pipe", pos))
+				"w":
+					add_child(Stunner.make("bloom", pos))
+				"p":
+					if rng.randf() < 0.8:
+						var count := rng.randi_range(3, 5)
+						for i in range(count):
+							add_child(Parasite.make(pos + Vector2(rng.randf_range(-30, 30), rng.randf_range(-20, 20))))
+				"v":
+					if rng.randf() < 0.75:
+						add_child(GravityWell.make(pos))
 				"V":
 					_spawn_valve(pos, r)
 				"N":
@@ -309,15 +263,85 @@ func _spawn_entities() -> void:
 				"B":
 					var keeper_id := _keeper_for_row(r)
 					arena_index[keeper_id] = pos
-				"G":
-					pass  # handled as a block below
-				"c", "C", "<", ">":
+				"G", "F":
+					pass  # handled as blocks below
+				"c", "C", "<", ">", "x":
 					pass  # merged into areas below
 
 	_build_currents()
+	_build_crush_zones()
 	_build_gates()
+	_build_finale_gate()
 	_spawn_keepers(arena_index)
 	_spawn_logs(log_cells)
+
+## Horizontal runs of 'x' become crushing timers.
+func _build_crush_zones() -> void:
+	for r in range(world_rows):
+		var c := 0
+		while c < WORLD_COLS:
+			if grid[r][c] == "x":
+				var start := c
+				while c < WORLD_COLS and grid[r][c] == "x":
+					c += 1
+				# grow one tile up/down so the clench fills the corridor
+				add_child(CrushZone.make(Rect2(start * TILE, (r - 1) * TILE,
+						(c - start) * TILE, TILE * 3)))
+			else:
+				c += 1
+
+var finale_gate_pos := Vector2.ZERO
+
+## The iris in the floor of the Throat: E to descend (suit V required).
+func _build_finale_gate() -> void:
+	var min_c := WORLD_COLS
+	var max_c := -1
+	var gate_r := -1
+	for r in range(world_rows):
+		for c in range(WORLD_COLS):
+			if grid[r][c] == "F":
+				min_c = mini(min_c, c)
+				max_c = maxi(max_c, c)
+				gate_r = r
+	if gate_r < 0:
+		return
+	finale_gate_pos = Vector2((min_c + max_c + 1) * TILE / 2.0, gate_r * TILE + TILE / 2.0)
+	var spr := Sprite2D.new()
+	spr.texture = load("res://assets/finale_gate.png")
+	spr.position = finale_gate_pos
+	spr.scale = Vector2((max_c - min_c + 1) * TILE / 96.0, 1.5)
+	spr.z_index = 4
+	add_child(spr)
+	var glow := PointLight2D.new()
+	glow.texture = load("res://assets/halo.png")
+	glow.position = finale_gate_pos
+	glow.scale = Vector2(0.7, 0.3)
+	glow.energy = 0.4
+	glow.color = Color(0.9, 0.3, 0.3)
+	add_child(glow)
+
+var _gate_hinted := false
+
+func _update_finale_gate() -> void:
+	if finale_gate_pos == Vector2.ZERO or player.dead:
+		return
+	var dist := player.global_position.distance_to(finale_gate_pos)
+	if dist < 90.0 and not _gate_hinted:
+		_gate_hinted = true
+		if Game.suit_tier >= Game.MAX_SUIT:
+			player.event_message.emit("The iris waits. Press E to descend where the line goes.")
+		else:
+			player.event_message.emit("The iris ignores you. Nothing rated under Suit V survives what's below.")
+	if dist < 70.0 and Game.suit_tier >= Game.MAX_SUIT \
+			and Input.is_action_just_pressed("interact"):
+		ending = true
+		player.frozen = true
+		Sfx.play("gate")
+		Sfx.stop_music(1.0)
+		Sfx.stop_ambience()
+		var timer := get_tree().create_timer(0.8)
+		timer.timeout.connect(func() -> void:
+			get_tree().change_scene_to_file("res://scenes/Finale.tscn"))
 
 func _keeper_for_row(r: int) -> int:
 	return row_band[r]  # arena 1 sits in band 1, etc.
@@ -748,6 +772,7 @@ func _process(delta: float) -> void:
 	_update_band()
 	_update_pings(delta)
 	_update_valves(delta)
+	_update_finale_gate()
 	_feed_noise()
 
 	if _shot_timer > 0.0:
@@ -782,12 +807,20 @@ func _update_pressure(delta: float) -> void:
 	else:
 		strain_time = 0.0
 
+var warden: Warden = null
+
 func _update_band() -> void:
 	var r := clampi(int(player.global_position.y / TILE), 0, world_rows - 1)
 	var band := row_band[r]
 	if band != current_band:
 		current_band = band
 		hud.show_band_splash(Game.BANDS[band].name)
+		Sfx.play_music("music_band%d" % band)
+		# the Warden patrols every band-5 dive
+		if band == 5 and warden == null:
+			warden = Warden.make(player.global_position + Vector2(500, 200))
+			add_child(warden)
+			player.event_message.emit("Something vast turns toward your light.")
 
 func _update_pings(delta: float) -> void:
 	var alive := []
@@ -832,6 +865,7 @@ func _bank() -> void:
 	player.frozen = true
 	Sfx.play("bank")
 	Sfx.stop_ambience()
+	Sfx.stop_music(1.0)
 	Game.bank_dive(player.carried_salvage(), player.carried_relics(),
 			max_depth_m, dive_time, net_recovered)
 	_end_dive()
@@ -840,6 +874,7 @@ func _on_player_died(reason: String) -> void:
 	ending = true
 	Sfx.play("death")
 	Sfx.stop_ambience()
+	Sfx.stop_music(1.5)
 	Game.record_death(player.global_position, player.carried_salvage(),
 			player.carried_relics(), max_depth_m, dive_time, reason)
 	_end_dive(1.6)

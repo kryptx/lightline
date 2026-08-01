@@ -92,7 +92,7 @@ func _process(delta: float) -> void:
 	if _hunt_time > 0.0:
 		_hunt_time -= delta
 		target = _heard_at
-		speed = HUNT_SPEED
+		speed = HUNT_SPEED * Game.fauna_speed_scale()
 	var desired := (target - position)
 	desired = desired.normalized() * speed if desired.length() > 6.0 else Vector2.ZERO
 	_vel = _vel.lerp(desired, 1.0 - exp(-2.0 * delta))

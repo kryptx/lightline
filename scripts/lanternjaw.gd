@@ -89,7 +89,7 @@ func _process(delta: float) -> void:
 				_chasing = false
 			else:
 				target = player.global_position
-				speed = CHASE_SPEED
+				speed = CHASE_SPEED * Game.fauna_speed_scale()
 	if not _chasing:
 		target = home + Vector2(sin(Time.get_ticks_msec() / 900.0 + home.x) * 30.0, 0)
 	_steer(target, speed, delta)

@@ -18,12 +18,17 @@ const BANDS := {
 	1: {"name": "THE SHALLOWS", "suit": 1},
 	2: {"name": "THE MIDDENS", "suit": 2},
 	3: {"name": "THE CATHEDRAL", "suit": 3},
+	4: {"name": "THE GARDENS", "suit": 4},
+	5: {"name": "THE THROAT", "suit": 5},
 }
+const MAX_SUIT := 5
 ## Suit tiers gate the depth bands. Buying a tier needs the previous Keeper's
 ## pressure core plus relics.
 const SUIT_TIERS := {
 	2: {"relics": 4, "core": 1, "label": "Suit II — Middens-rated"},
 	3: {"relics": 8, "core": 2, "label": "Suit III — Cathedral-rated"},
+	4: {"relics": 12, "core": 3, "label": "Suit IV — Gardens-rated"},
+	5: {"relics": 16, "core": 4, "label": "Suit V — Throat-rated"},
 }
 const ABILITY_ORDER := ["sonar", "flare", "anchor"]
 const ABILITIES := {
@@ -55,7 +60,8 @@ const ABILITIES := {
 		],
 	},
 }
-const SPECIES_ORDER := ["fish_teal", "fish_rose", "urchin", "lanternjaw", "eel", "choir"]
+const SPECIES_ORDER := ["fish_teal", "fish_rose", "urchin", "lanternjaw", "eel", "choir",
+		"parasite", "warden"]
 const SPECIES := {
 	"fish_teal": {"title": "Glimmerfin", "passive": "You read their slipstream: +8% swim speed."},
 	"fish_rose": {"title": "Rosefin", "passive": "You notice what they nose at: pickups glint brighter and farther."},
@@ -63,6 +69,8 @@ const SPECIES := {
 	"lanternjaw": {"title": "Lanternjaw", "passive": "Its lure no longer fools you — false lights burn red in your eye."},
 	"eel": {"title": "Midden Eel", "passive": "You count its coil: eels telegraph longer before striking."},
 	"choir": {"title": "The Choir", "passive": "You hear the hymn's shape: their song rings visibly farther, and panics you half as much."},
+	"parasite": {"title": "Wick Louse", "passive": "You've mapped its mouthparts: attached parasites sip half the light."},
+	"warden": {"title": "The Warden", "passive": "You know its gaze now — you feel it coming from twice as far away."},
 }
 
 var stats := {"lungs": 0, "beam": 0, "grip": 0, "fins": 0, "nerve": 0}
@@ -78,8 +86,19 @@ var keepers_defeated := [] # keeper ids
 var abilities := {"sonar": 0, "flare": 0, "anchor": 0}  # owned ranks 0..3
 var equipped := ["", ""]   # ability ids in slots Q / R
 var bestiary := []         # scanned species ids
-var logs_found := []       # log ids 1..15
+var logs_found := []       # log ids
 var anchor_stash := {}     # {"x","y","salvage","relics"} surviving cargo
+var endings_seen := []     # "relight" | "cut" | "descend"
+var last_ending := ""      # colors the hub epilogue
+## Assist & audio settings (§7: no content locked behind difficulty).
+var settings := {
+	"drain_assist": 0,     # 0 = off, 1 = -25%, 2 = -50%
+	"panic_off": false,
+	"gentle_fauna": false, # predators move/strike 30% slower
+	"vol_master": 1.0,
+	"vol_music": 0.8,
+	"vol_sfx": 1.0,
+}
 ## Corpse net: {"x": float, "y": float, "salvage": int, "relics": int, "depth_m": float}
 var pending_net := {}
 ## Ledger for the last dive, shown at the lighthouse.
@@ -92,6 +111,7 @@ var timescale := 1.0
 var greedy := false
 var spawn_depth_m := 0.0
 var test_keeper := 0
+var test_finale := ""
 var _fresh := false
 
 var _post_load_overrides: Array[Callable] = []
@@ -124,7 +144,23 @@ func reel_speed() -> float:
 	return 230.0 + 9.0 * stats.fins
 
 func panic_gain_scale() -> float:
+	if settings.panic_off:
+		return 0.0
 	return 1.0 / (1.0 + 0.18 * stats.nerve)
+
+## Assist: global multiplier on every Lightline cost (drain, strain, hits).
+func drain_scale() -> float:
+	return [1.0, 0.75, 0.5][int(settings.drain_assist)]
+
+## Assist: predators move, hunt, and strike slower.
+func fauna_speed_scale() -> float:
+	return 0.7 if settings.gentle_fauna else 1.0
+
+func record_ending(id: String) -> void:
+	if not endings_seen.has(id):
+		endings_seen.append(id)
+	last_ending = id
+	save_game()
 
 func stat_cost(stat: String) -> int:
 	var rank: int = stats[stat]
@@ -249,12 +285,16 @@ func equip_ability(id: String, slot: int) -> void:
 
 ## The "next time" hint: nearest unpurchased upgrade.
 func next_goal_hint() -> String:
+	if suit_tier >= MAX_SUIT and endings_seen.is_empty():
+		return "The suit will hold. Whatever waits at the floor of the Throat — go and look it in the eye."
+	if suit_tier >= MAX_SUIT and endings_seen.size() < 3:
+		return "You chose once. The floor of the Throat would let you choose differently."
 	if can_buy_suit(suit_tier + 1):
 		return "The pressure core hums in the workshop. %s is ready to be fitted." % SUIT_TIERS[suit_tier + 1].label
 	if SUIT_TIERS.has(suit_tier + 1) and cores.has(SUIT_TIERS[suit_tier + 1].core):
 		return "You hold the core for %s — %d more relics to fit it." % [
 			SUIT_TIERS[suit_tier + 1].label, SUIT_TIERS[suit_tier + 1].relics - relics]
-	if suit_tier < 3 and not keeper_defeated(suit_tier):
+	if suit_tier < MAX_SUIT and not keeper_defeated(suit_tier):
 		return "Something big guards the floor of %s. Its core would rate your suit deeper." % BANDS[suit_tier].name.capitalize()
 	var best_stat := ""
 	var best_cost := 1 << 30
@@ -334,6 +374,9 @@ func save_game() -> void:
 		"bestiary": bestiary,
 		"logs_found": logs_found,
 		"anchor_stash": anchor_stash,
+		"endings_seen": endings_seen,
+		"last_ending": last_ending,
+		"settings": settings,
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -374,6 +417,15 @@ func load_game() -> void:
 	logs_found = _int_array(parsed.get("logs_found", []))
 	var stash = parsed.get("anchor_stash", {})
 	anchor_stash = stash if typeof(stash) == TYPE_DICTIONARY else {}
+	endings_seen = []
+	for e in parsed.get("endings_seen", []):
+		endings_seen.append(str(e))
+	last_ending = str(parsed.get("last_ending", ""))
+	var loaded_settings = parsed.get("settings", {})
+	if typeof(loaded_settings) == TYPE_DICTIONARY:
+		for key in settings:
+			if loaded_settings.has(key):
+				settings[key] = loaded_settings[key]
 
 func _int_array(raw) -> Array:
 	var out := []
@@ -398,7 +450,7 @@ func _parse_args() -> void:
 		elif arg == "--greedy":
 			greedy = true
 		elif arg.begins_with("--suit="):  # debug
-			var tier := clampi(int(arg.trim_prefix("--suit=")), 1, 3)
+			var tier := clampi(int(arg.trim_prefix("--suit=")), 1, MAX_SUIT)
 			_post_load_overrides.append(func() -> void: suit_tier = tier)
 		elif arg.begins_with("--relics="):  # debug
 			var amount := int(arg.trim_prefix("--relics="))
@@ -409,6 +461,8 @@ func _parse_args() -> void:
 			_post_load_overrides.append(func() -> void: bestiary = SPECIES_ORDER.duplicate())
 		elif arg.begins_with("--test-keeper="):  # debug: autopilot fights keeper N
 			test_keeper = int(arg.trim_prefix("--test-keeper="))
+		elif arg.begins_with("--test-finale="):  # debug: relight | cut | descend
+			test_finale = arg.trim_prefix("--test-finale=")
 		elif arg.begins_with("--stat="):  # debug: --stat=lungs:10
 			var kv := arg.trim_prefix("--stat=").split(":")
 			_post_load_overrides.append(func() -> void: stats[kv[0]] = int(kv[1]))
