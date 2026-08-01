@@ -1,0 +1,36 @@
+; Engine configuration file.
+; Generated for LIGHTLINE.
+
+config_version=5
+
+[application]
+
+config/name="Lightline"
+config/description="A descent roguelite: dive from a derelict lighthouse, spend the light, decide when to turn back."
+run/main_scene="res://scenes/Lighthouse.tscn"
+config/features=PackedStringArray("4.5")
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Lightline"
+config/icon="res://assets/icon.png"
+
+[audio]
+
+buses/default_bus_layout=""
+
+[autoload]
+
+Game="*res://scripts/game_state.gd"
+Sfx="*res://scripts/sfx.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0.05, 0.07, 0.12, 1)
+2d/snap/snap_2d_transforms_to_pixel=true
