@@ -14,8 +14,13 @@ on top of the vertical slice's banking/death rules and corpse run.
 Requires [Godot 4.x](https://godotengine.org) (`brew install --cask godot`).
 
 ```sh
-godot --path .          # or open the folder in the Godot editor and press ▶
+godot --headless --import --path .   # first run only: import assets (also after pulling new assets)
+godot --path .                       # or open the folder in the Godot editor and press ▶
 ```
+
+The import step populates the untracked `.godot/` cache; without it a fresh
+checkout will fail to load textures and sounds. Opening the project in the
+Godot editor does the same thing automatically.
 
 ## Controls
 
