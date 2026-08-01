@@ -186,12 +186,6 @@ func next_log_for_band(band: int) -> int:
 			return id
 	return -1
 
-func max_band() -> int:
-	return suit_tier
-
-func band_for_depth_row(row: int, rows_per_band: int) -> int:
-	return clampi(row / rows_per_band + 1, 1, 3)
-
 func keeper_defeated(id: int) -> bool:
 	return keepers_defeated.has(id)
 

@@ -31,12 +31,14 @@ var scan_species := ""       # current scan target
 var scan_progress := 0.0
 var ability_cd := {"sonar": 0.0, "flare": 0.0, "anchor": 0.0}
 
+var auto_mode := "loot"
+
 var _dash_cd := 0.0
 var _iframes := 0.0
 var _warn_tick := 0.0
 var _time := 0.0
-var _auto_drift := 0.0
 var _scan_tick_t := 0.0
+var _pilot: Autopilot
 
 var sprite: AnimatedSprite2D
 var lamp: PointLight2D
@@ -183,8 +185,10 @@ func _physics_process(delta: float) -> void:
 	var dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	reeling = Input.is_action_pressed("tether")
 	if autopilot:
-		dir = _autopilot_dir(delta)
-		reeling = _auto_reel
+		if _pilot == null:
+			_pilot = Autopilot.new(self)
+		dir = _pilot.dir(delta)
+		reeling = _pilot.reel
 
 	# momentum swimming: constant drag, input acceleration, soft cap.
 	# The cap bleeds off gradually so dash bursts genuinely carry speed.
@@ -199,11 +203,8 @@ func _physics_process(delta: float) -> void:
 		velocity.y = lerpf(velocity.y, -Game.reel_speed(), 1.0 - exp(-6.0 * delta))
 		velocity.x = lerpf(velocity.x, dir.x * max_speed * 0.45, 1.0 - exp(-3.0 * delta))
 
-	if Input.is_action_just_pressed("dash") and _dash_cd <= 0.0 and dir != Vector2.ZERO:
-		velocity += dir * DASH_IMPULSE
-		_dash_cd = DASH_COOLDOWN
-		light -= DASH_LIGHT_COST
-		Sfx.play("dash", -6.0)
+	if Input.is_action_just_pressed("dash") and dir != Vector2.ZERO:
+		try_dash(dir)
 
 	if Input.is_action_just_pressed("drop") and not cargo.is_empty():
 		var item := drop_heaviest()
@@ -217,7 +218,7 @@ func _physics_process(delta: float) -> void:
 
 	for slot in range(2):
 		if Input.is_action_just_pressed("ability_%d" % (slot + 1)):
-			_use_ability(slot)
+			use_ability(slot)
 	for id in ability_cd:
 		ability_cd[id] = maxf(0.0, ability_cd[id] - delta)
 
@@ -298,8 +299,18 @@ func _die() -> void:
 	tween.parallel().tween_property(glow, "energy", 0.05, 1.0)
 	player_died.emit(reason)
 
+func try_dash(dir: Vector2, power := 1.0) -> void:
+	if _dash_cd > 0.0 or dir == Vector2.ZERO:
+		return
+	velocity += dir * DASH_IMPULSE * power
+	_dash_cd = DASH_COOLDOWN
+	light -= DASH_LIGHT_COST
+	Sfx.play("dash", -6.0)
+
 # ---------- abilities ----------
-func _use_ability(slot: int) -> void:
+func use_ability(slot: int) -> void:
+	if slot < 0:
+		return
 	var id: String = Game.equipped[slot]
 	if id == "" or Game.ability_rank(id) <= 0 or ability_cd.get(id, 0.0) > 0.0:
 		return
@@ -365,131 +376,3 @@ func _update_scan(delta: float) -> void:
 func _reset_scan() -> void:
 	scan_species = ""
 	scan_progress = 0.0
-
-# Demo/soak-test autopilot: plays the real loop — seeks pickups (the corpse
-# net first), and reels for the surface when the return budget gets tight.
-# "fight" mode plays a keeper arena: lure the charge across an armed stunner,
-# then dash the exposed weakpoint.
-var _auto_reel := false
-var auto_mode := "loot"
-var _valve_pressed := false
-var _stuck_t := 0.0
-var _unstick_until := 0.0
-var _unstick_dir := Vector2.ZERO
-
-func _autopilot_dir(delta: float) -> Vector2:
-	if auto_mode == "fight":
-		return _autopilot_fight(delta)
-	return _autopilot_loot(delta)
-
-func _autopilot_fight(delta: float) -> Vector2:
-	_auto_drift += delta
-	# blunder out of corners when wedged against geometry
-	_stuck_t = _stuck_t + delta if velocity.length() < 14.0 else 0.0
-	if _unstick_until > 0.0:
-		_unstick_until -= delta
-		return _unstick_dir
-	if _stuck_t > 1.4:
-		_stuck_t = 0.0
-		_unstick_until = 0.6
-		_unstick_dir = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
-		return _unstick_dir
-	if _valve_pressed:
-		Input.action_release("interact")
-		_valve_pressed = false
-	# occasionally ping to exercise sonar in fight tests too
-	if Game.ability_rank("sonar") > 0 and ability_cd.get("sonar", 0.0) <= 0.0:
-		_use_ability(Game.equipped.find("sonar"))
-	var keeper: Node2D = null
-	var keeper_d := 1e12
-	for k in get_tree().get_nodes_in_group("keepers"):
-		var d: float = global_position.distance_to((k as Node2D).global_position)
-		if d < keeper_d:
-			keeper_d = d
-			keeper = k
-	if keeper == null:
-		_auto_reel = true
-		return Vector2(0, -1)
-	if keeper.state == "stunned":
-		var to_boss := (keeper.global_position - global_position)
-		if to_boss.length() < 130.0 and _dash_cd <= 0.0:
-			velocity += to_boss.normalized() * DASH_IMPULSE * 1.2
-			_dash_cd = DASH_COOLDOWN
-		return to_boss.normalized()
-	# find an armed stunner in THIS keeper's arena; if none (bellringer), go
-	# work a valve
-	var prop: Node2D = null
-	var best := 1e9
-	for s in get_tree().get_nodes_in_group("stunners"):
-		if not s.armed:
-			continue
-		if not (keeper as Keeper).arena.grow(80.0).has_point((s as Node2D).global_position):
-			continue
-		var d: float = keeper.global_position.distance_to(s.global_position)
-		if d < best:
-			best = d
-			prop = s
-	if prop == null:
-		var dive := get_parent()
-		if not dive.valves.is_empty():
-			var valve: Node2D = null
-			var vd := 1e12
-			for v in dive.valves:
-				var d: float = global_position.distance_to((v.node as Node2D).position)
-				if d < vd:
-					vd = d
-					valve = v.node
-			var to_valve := valve.position - global_position
-			if to_valve.length() < 32.0:
-				Input.action_press("interact")
-				_valve_pressed = true
-				return Vector2.ZERO
-			return to_valve.normalized()
-		return Vector2(sin(_auto_drift * 2.0), cos(_auto_drift * 1.7)).normalized() * 0.6
-	# hover just past the prop so the charge crosses it
-	var lure_pos: Vector2 = prop.global_position \
-			+ (prop.global_position - keeper.global_position).normalized() * 46.0
-	var to_lure := lure_pos - global_position
-	if to_lure.length() <= 14.0:
-		# the Cantor hunts noise: kick up a burst right here by the pipe
-		if Keeper.CONFIG[keeper.id].target == "noise" and keeper.state == "idle" \
-				and _dash_cd <= 0.0:
-			velocity += (global_position - keeper.global_position).normalized() * DASH_IMPULSE
-			_dash_cd = DASH_COOLDOWN
-		return Vector2.ZERO
-	return to_lure.normalized()
-
-func _autopilot_loot(delta: float) -> Vector2:
-	_auto_drift += delta
-	if Game.ability_rank("sonar") > 0 and ability_cd.get("sonar", 0.0) <= 0.0 \
-			and depth_m() > 30.0 and "sonar" in Game.equipped:
-		_use_ability(Game.equipped.find("sonar"))
-	# don't dive below the suit rating (greedy mode ignores even this)
-	if not Game.greedy and global_position.y > get_parent().rated_max_y - 100.0:
-		_auto_reel = true
-	# bank when the margin closes (greedy mode never turns back, on purpose)
-	if Game.greedy:
-		_auto_reel = false
-	elif _auto_reel or return_cost_s() > light - 14.0:
-		_auto_reel = true
-		return Vector2(sin(_auto_drift * 2.0) * 0.3, -1.0)
-	var dive := get_parent()
-	var target: Node2D = null
-	if dive.net_pickup != null and is_instance_valid(dive.net_pickup):
-		target = dive.net_pickup
-	else:
-		var best := 320.0
-		for node in get_tree().get_nodes_in_group("pickups"):
-			var p := node as Node2D
-			if p == null or not is_instance_valid(p):
-				continue
-			var d := global_position.distance_to(p.global_position)
-			if p.is_in_group("logs"):
-				d *= 0.35  # a recording is worth a detour
-			if d < best:
-				best = d
-				target = p
-	if target:
-		return (target.global_position - global_position).normalized()
-	var x := sin(_auto_drift * 1.4) * 0.8
-	return Vector2(x, 1.0).normalized()

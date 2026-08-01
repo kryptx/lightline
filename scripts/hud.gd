@@ -255,8 +255,8 @@ func show_log(id: int) -> void:
 	tween.tween_property(log_panel, "modulate:a", 0.0, 1.5)
 	tween.tween_callback(func() -> void: log_panel.visible = false)
 
-func show_band_splash(name: String) -> void:
-	band_label.text = name
+func show_band_splash(band_name: String) -> void:
+	band_label.text = band_name
 	if _band_tween:
 		_band_tween.kill()
 	_band_tween = create_tween()

@@ -552,31 +552,31 @@ func _spawn_logs(log_cells: Dictionary) -> void:
 		if log_id < 0:
 			continue
 		var pos: Vector2 = cells[rng.randi_range(0, cells.size() - 1)]
-		var log := Area2D.new()
-		log.add_to_group("pickups")  # sonar pings recordings too
-		log.add_to_group("logs")
-		log.position = pos
-		log.collision_layer = 0
-		log.collision_mask = 2
+		var log_area := Area2D.new()
+		log_area.add_to_group("pickups")  # sonar pings recordings too
+		log_area.add_to_group("logs")
+		log_area.position = pos
+		log_area.collision_layer = 0
+		log_area.collision_mask = 2
 		var shape := CollisionShape2D.new()
 		var circle := CircleShape2D.new()
 		circle.radius = 14.0
 		shape.shape = circle
-		log.add_child(shape)
-		log.add_child(Sprites.animated("res://assets/log_device.png", 2, 2.0))
+		log_area.add_child(shape)
+		log_area.add_child(Sprites.animated("res://assets/log_device.png", 2, 2.0))
 		var light := PointLight2D.new()
 		light.texture = load("res://assets/halo.png")
 		light.scale = Vector2(0.18, 0.18)
 		light.energy = 0.5
 		light.color = Color(0.5, 0.95, 0.85)
-		log.add_child(light)
-		log.body_entered.connect(func(b: Node2D) -> void:
+		log_area.add_child(light)
+		log_area.body_entered.connect(func(b: Node2D) -> void:
 			if b is Player and not (b as Player).dead:
 				Game.record_log(log_id)
 				Sfx.play("log")
 				hud.show_log(log_id)
-				log.queue_free())
-		add_child(log)
+				log_area.queue_free())
+		add_child(log_area)
 
 func _spawn_net_if_pending() -> void:
 	var net := Game.take_pending_net()
@@ -735,11 +735,6 @@ func _on_keeper_defeated(id: int) -> void:
 		beacons[id].node.set_meta("active", true)
 		beacons[id].light.energy = 0.9
 		beacons[id].sprite.modulate = Color.WHITE
-
-## The Cantor listens; dashes and fast swimming near it register as noise.
-func report_noise(at: Vector2) -> void:
-	for keeper in get_tree().get_nodes_in_group("keepers"):
-		keeper.hear_noise(at)
 
 # ---------- per-frame ----------
 func _process(delta: float) -> void:

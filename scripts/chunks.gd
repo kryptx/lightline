@@ -1,7 +1,8 @@
 class_name Chunks
-## Hand-authored Band 1 (The Shallows) chunks, 40 cols x 15 rows each.
-## Dives assemble: SURFACE + 3 of UPPER + 4 of LOWER + FLOOR, with seeded
-## variation (mirroring + spawn rolls).
+## Hand-authored chunks for Bands 1-3, 40 cols x 15 rows each.
+## Dives assemble: SURFACE + 2 UPPER + 3 LOWER + ARENA1 + 4 BAND2 + ARENA2
+## + 4 BAND3 + ARENA3 + FLOOR3, with seeded variation (mirroring + spawn
+## rolls). Arenas and surface are never mirrored.
 ##
 ## Legend: '#' rock  '.' water  's' salvage  'r' relic  'a' air pocket
 ##         'u' urchin  'k' kelp  'f' fish school  'L' Marlowe log
