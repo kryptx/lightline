@@ -30,7 +30,7 @@ func _ready() -> void:
 	hum = AudioStreamPlayer2D.new()
 	var stream: AudioStreamWAV = load("res://assets/sfx/well_hum.wav")
 	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_end = stream.data.size() / 2
+	stream.loop_end = int(stream.get_length() * stream.mix_rate)
 	hum.stream = stream
 	hum.volume_db = -10.0
 	hum.max_distance = 500.0

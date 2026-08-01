@@ -101,7 +101,8 @@ n = int(SR * 4)
 amb = []
 for i in range(n):
     t = i / SR
-    s = 0.16 * math.sin(2 * math.pi * 55 * t) + 0.10 * math.sin(2 * math.pi * 82.4 * t + 0.6)
+    # whole cycles per 4 s loop only (82.4 Hz used to click at every seam)
+    s = 0.16 * math.sin(2 * math.pi * 55 * t) + 0.10 * math.sin(2 * math.pi * 82.5 * t + 0.6)
     s += 0.05 * math.sin(2 * math.pi * 110 * t) * (0.5 + 0.5 * math.sin(2 * math.pi * 0.25 * t))
     amb.append(s)
 write("ambience.wav", amb)

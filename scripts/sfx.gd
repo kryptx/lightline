@@ -76,7 +76,10 @@ func play(name: String, volume_db: float = 0.0, pitch_jitter: float = 0.06) -> v
 func _looped(name: String) -> AudioStreamWAV:
 	var stream: AudioStreamWAV = _streams[name]
 	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_end = stream.data.size() / 2
+	# loop_end is in SAMPLES. data.size()/2 only works for uncompressed PCM16;
+	# Godot imports WAVs QOA-compressed by default, which made loops restart
+	# ~1.6s in with a hard mid-waveform cut (an audible periodic click).
+	stream.loop_end = int(stream.get_length() * stream.mix_rate)
 	return stream
 
 ## Crossfade to a loop; no-op if it is already playing.
