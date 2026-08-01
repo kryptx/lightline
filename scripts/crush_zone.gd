@@ -26,7 +26,7 @@ func _process(delta: float) -> void:
 	_timer -= delta
 	var player := get_tree().get_first_node_in_group("player") as Player
 	var player_near: bool = player != null and not player.dead \
-			and rect.grow(380.0).has_point(player.global_position)
+			and rect.grow(260.0).has_point(player.global_position)
 	match _phase:
 		"safe":
 			overlay.color.a = 0.0
@@ -34,7 +34,7 @@ func _process(delta: float) -> void:
 				_phase = "warn"
 				_timer = 1.3
 				if player_near:
-					Sfx.play("crush_warn", -8.0)
+					Sfx.play("crush_warn", -12.0)
 		"warn":
 			overlay.color.a = 0.10 + 0.10 * sin(Time.get_ticks_msec() / 40.0)
 			if _timer <= 0.0:

@@ -102,8 +102,14 @@ func _set_bloom(open: bool) -> void:
 	armed = open
 	sprite.play("open" if open else "closed")
 	(get_node("Glow") as PointLight2D).energy = 0.6 if open else 0.0
-	if open:
-		Sfx.play("bloom", -10.0)
+	# only audible if you're close enough to care — a reef of blooms cycling
+	# off-screen shouldn't rattle the whole dive
+	if open and _player_within(340.0):
+		Sfx.play("bloom", -12.0)
+
+func _player_within(dist: float) -> bool:
+	var player := get_tree().get_first_node_in_group("player") as Node2D
+	return player != null and position.distance_to(player.global_position) < dist
 
 func _process(delta: float) -> void:
 	if kind == "bloom":
