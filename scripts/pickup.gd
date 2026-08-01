@@ -82,6 +82,14 @@ func _ready() -> void:
 	add_to_group("pickups")
 	z_index = 5
 	monitoring = true
+	# Rosefin passive: you notice what they nose at — plain salvage glints
+	if kind == "salvage" and Game.has_scan("fish_rose"):
+		var glint := PointLight2D.new()
+		glint.texture = load("res://assets/halo.png")
+		glint.scale = Vector2(0.14, 0.14)
+		glint.energy = 0.4
+		glint.color = Color(1.0, 0.9, 0.7)
+		add_child(glint)
 	collision_layer = 0
 	collision_mask = 2
 	var shape := CollisionShape2D.new()

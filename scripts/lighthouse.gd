@@ -11,6 +11,9 @@ var hint_label: Label
 var dive_button: Button
 var respec_button: Button
 var lamp_glow: TextureRect
+var gear_box: VBoxContainer
+var archive_box: VBoxContainer
+var log_reader: Label
 var _time := 0.0
 
 func _ready() -> void:
@@ -63,43 +66,49 @@ func _panel_style() -> StyleBoxFlat:
 func _build_panel() -> void:
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", _panel_style())
-	panel.position = Vector2(36, 36)
-	panel.custom_minimum_size = Vector2(430, 648)
+	panel.position = Vector2(36, 28)
+	panel.custom_minimum_size = Vector2(470, 664)
 	add_child(panel)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
+	box.add_theme_constant_override("separation", 7)
 	panel.add_child(box)
 
 	var title := Label.new()
 	title.text = "L I G H T L I N E"
-	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_font_size_override("font_size", 28)
 	title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.6))
 	box.add_child(title)
 
-	var subtitle := Label.new()
-	subtitle.text = "The lighthouse holds. The trench waits."
-	subtitle.add_theme_font_size_override("font_size", 13)
-	subtitle.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
-	box.add_child(subtitle)
+	var currencies := HBoxContainer.new()
+	currencies.add_theme_constant_override("separation", 18)
+	box.add_child(currencies)
+	salvage_label = _label(currencies, 16, Color(1.0, 0.88, 0.6))
+	relic_label = _label(currencies, 16, Color(0.6, 0.95, 0.85))
+	record_label = _label(box, 12, Color(0.7, 0.75, 0.85))
 
-	box.add_child(HSeparator.new())
+	var tabs := TabContainer.new()
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.custom_minimum_size = Vector2(0, 380)
+	box.add_child(tabs)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--tab="):  # debug: screenshot a specific tab
+			tabs.current_tab = int(arg.trim_prefix("--tab="))
+			# deferred too — children are added after this line
+			tabs.set_deferred("current_tab", int(arg.trim_prefix("--tab=")))
 
-	salvage_label = _label(box, 17, Color(1.0, 0.88, 0.6))
-	relic_label = _label(box, 17, Color(0.6, 0.95, 0.85))
-	record_label = _label(box, 13, Color(0.7, 0.75, 0.85))
-
-	box.add_child(HSeparator.new())
-
+	# --- Body tab ---
+	var body_box := VBoxContainer.new()
+	body_box.name = "Body"
+	body_box.add_theme_constant_override("separation", 8)
+	tabs.add_child(body_box)
 	var body_title := Label.new()
-	body_title.text = "BODY — spend salvage"
-	body_title.add_theme_font_size_override("font_size", 15)
-	body_title.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
-	box.add_child(body_title)
-
+	body_title.text = "Five ways to be better at being down there. Paid in salvage."
+	body_title.add_theme_font_size_override("font_size", 12)
+	body_title.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	body_box.add_child(body_title)
 	for stat in Game.STAT_ORDER:
-		box.add_child(_stat_row(stat))
-
+		body_box.add_child(_stat_row(stat))
 	respec_button = Button.new()
 	respec_button.text = "Respec (refund all, fee 10)"
 	respec_button.add_theme_font_size_override("font_size", 12)
@@ -107,17 +116,30 @@ func _build_panel() -> void:
 		if Game.respec():
 			Sfx.play("ui")
 			_refresh())
-	box.add_child(respec_button)
+	body_box.add_child(respec_button)
 
-	box.add_child(HSeparator.new())
-	net_label = _label(box, 13, Color(1.0, 0.7, 0.5))
+	# --- Suit & Gear tab ---
+	var gear_scroll := ScrollContainer.new()
+	gear_scroll.name = "Suit & Gear"
+	tabs.add_child(gear_scroll)
+	gear_box = VBoxContainer.new()
+	gear_box.add_theme_constant_override("separation", 8)
+	gear_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gear_scroll.add_child(gear_box)
+
+	# --- Archive tab ---
+	var archive_scroll := ScrollContainer.new()
+	archive_scroll.name = "Archive"
+	tabs.add_child(archive_scroll)
+	archive_box = VBoxContainer.new()
+	archive_box.add_theme_constant_override("separation", 5)
+	archive_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	archive_scroll.add_child(archive_box)
+
+	net_label = _label(box, 12, Color(1.0, 0.7, 0.5))
 	net_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint_label = _label(box, 13, Color(0.75, 0.85, 0.8))
+	hint_label = _label(box, 12, Color(0.75, 0.85, 0.8))
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(spacer)
 
 	dive_button = Button.new()
 	dive_button.text = "▼   D I V E"
@@ -173,6 +195,127 @@ func _label(parent: Control, size: int, color: Color) -> Label:
 	l.add_theme_color_override("font_color", color)
 	parent.add_child(l)
 	return l
+
+# ---------- suit & gear ----------
+func _rebuild_gear() -> void:
+	for child in gear_box.get_children():
+		child.queue_free()
+
+	var suit_title := _label(gear_box, 15, Color(0.9, 0.9, 0.95))
+	var tier_names := {1: "Suit I — Shallows-rated", 2: "Suit II — Middens-rated", 3: "Suit III — Cathedral-rated"}
+	suit_title.text = "⛑ %s" % tier_names[Game.suit_tier]
+
+	var next_tier := Game.suit_tier + 1
+	if Game.SUIT_TIERS.has(next_tier):
+		var req: Dictionary = Game.SUIT_TIERS[next_tier]
+		var need := _label(gear_box, 12, Color(0.7, 0.75, 0.85))
+		var have_core: bool = Game.cores.has(req.core)
+		need.text = "Next: %s — needs pressure core %d (%s) + %d relics" % [
+			req.label, req.core, "held" if have_core else "take it from the Keeper", req.relics]
+		need.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var buy := Button.new()
+		buy.text = "Fit %s" % req.label
+		buy.disabled = not Game.can_buy_suit(next_tier)
+		buy.pressed.connect(func() -> void:
+			if Game.buy_suit(next_tier):
+				Sfx.play("core")
+				_refresh())
+		gear_box.add_child(buy)
+	else:
+		_label(gear_box, 12, Color(0.7, 0.75, 0.85)).text = "The suit is rated for every charted depth. (The Gardens lie beyond the alpha.)"
+
+	gear_box.add_child(HSeparator.new())
+	_label(gear_box, 15, Color(0.9, 0.9, 0.95)).text = "ABILITIES — paid in relics, two equipped (Q / R)"
+
+	for id in Game.ABILITY_ORDER:
+		var info: Dictionary = Game.ABILITIES[id]
+		var rank := Game.ability_rank(id)
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+		gear_box.add_child(row)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 8)
+		row.add_child(head)
+		var icon := TextureRect.new()
+		icon.texture = load("res://assets/icon_%s.png" % id)
+		icon.custom_minimum_size = Vector2(22, 22)
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		head.add_child(icon)
+		var name_label := _label(head, 14, Color(1, 1, 1))
+		name_label.text = "%s %s" % [info.title, "★".repeat(rank)]
+		name_label.custom_minimum_size = Vector2(150, 0)
+		var buy := Button.new()
+		buy.add_theme_font_size_override("font_size", 12)
+		var cost := Game.ability_cost(id)
+		if cost < 0:
+			buy.text = "MAX"
+			buy.disabled = true
+		else:
+			buy.text = ("Learn" if rank == 0 else "Upgrade") + "  ◆%d" % cost
+			buy.disabled = not Game.can_buy_ability(id)
+		buy.pressed.connect(func() -> void:
+			if Game.buy_ability(id):
+				Sfx.play("upgrade")
+				_refresh())
+		head.add_child(buy)
+		if rank > 0:
+			for slot in range(2):
+				var equip := Button.new()
+				equip.toggle_mode = true
+				equip.text = ["Q", "R"][slot]
+				equip.button_pressed = Game.equipped[slot] == id
+				equip.add_theme_font_size_override("font_size", 12)
+				equip.pressed.connect(func() -> void:
+					Game.equip_ability(id, slot)
+					Sfx.play("ui")
+					_refresh())
+				head.add_child(equip)
+		var desc := _label(row, 11, Color(0.7, 0.75, 0.85))
+		if rank == 0:
+			desc.text = info.ranks[0]
+		else:
+			desc.text = info.ranks[rank - 1]
+			if rank < 3:
+				desc.text += "   →   next: " + info.ranks[rank]
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+# ---------- archive ----------
+func _rebuild_archive() -> void:
+	for child in archive_box.get_children():
+		child.queue_free()
+
+	_label(archive_box, 15, Color(0.9, 0.9, 0.95)).text = "BESTIARY — hold E near a creature, in your own light"
+	for species in Game.SPECIES_ORDER:
+		var info: Dictionary = Game.SPECIES[species]
+		var row := _label(archive_box, 12, Color(1, 1, 1))
+		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if Game.has_scan(species):
+			row.text = "● %s — %s" % [info.title, info.passive]
+			row.add_theme_color_override("font_color", Color(0.75, 0.95, 0.85))
+		else:
+			row.text = "○ %s — unscanned" % info.title
+			row.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
+
+	archive_box.add_child(HSeparator.new())
+	_label(archive_box, 15, Color(0.9, 0.9, 0.95)).text = "MARLOWE'S LOGS — %d / 15" % Game.logs_found.size()
+	for id in range(1, 16):
+		if Game.logs_found.has(id):
+			var btn := Button.new()
+			btn.text = "▶ " + Logs.ENTRIES[id].title
+			btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			btn.add_theme_font_size_override("font_size", 12)
+			btn.pressed.connect(func() -> void:
+				Sfx.play("log", -6.0)
+				log_reader.text = "%s\n\n%s" % [Logs.ENTRIES[id].title, Logs.ENTRIES[id].text]
+				log_reader.visible = true)
+			archive_box.add_child(btn)
+		else:
+			var row := _label(archive_box, 12, Color(1, 1, 1, 0.35))
+			row.text = "— Log %02d — static —" % id
+	log_reader = _label(archive_box, 12, Color(0.85, 0.9, 0.9))
+	log_reader.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	log_reader.visible = false
 
 # ---------- ledger ----------
 func _build_ledger() -> void:
@@ -261,6 +404,9 @@ func _refresh() -> void:
 
 	respec_button.visible = Game.spent_on_stats() > 0
 	respec_button.disabled = Game.salvage < Game.respec_cost()
+
+	_rebuild_gear()
+	_rebuild_archive()
 
 	if Game.pending_net.is_empty():
 		net_label.text = ""

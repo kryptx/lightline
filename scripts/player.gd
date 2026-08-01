@@ -23,12 +23,20 @@ var dead := false
 var frozen := false
 var autopilot := false
 var surface_y := 24.0
+# alpha systems
+var doused := false          # lamp killed on purpose (F)
+var strained := false        # below the suit's pressure rating
+var dark_pockets := 0        # inside N darkness pockets (beam suppressed)
+var scan_species := ""       # current scan target
+var scan_progress := 0.0
+var ability_cd := {"sonar": 0.0, "flare": 0.0, "anchor": 0.0}
 
 var _dash_cd := 0.0
 var _iframes := 0.0
 var _warn_tick := 0.0
 var _time := 0.0
 var _auto_drift := 0.0
+var _scan_tick_t := 0.0
 
 var sprite: AnimatedSprite2D
 var lamp: PointLight2D
@@ -146,11 +154,17 @@ func restore_light(amount: float) -> void:
 	light = minf(Game.max_light(), light + amount)
 	light_changed.emit(light, Game.max_light())
 
-func hurt(from_pos: Vector2) -> void:
+func add_panic(amount: float) -> void:
+	panic = minf(1.0, panic + amount * Game.panic_gain_scale())
+
+func hurt(from_pos: Vector2, cost: float = HURT_LIGHT_COST, species := "") -> void:
 	if _iframes > 0.0 or dead:
 		return
+	# knowing a creature blunts its worst surprise
+	if species == "urchin" and Game.has_scan("urchin"):
+		cost *= 0.5
 	_iframes = 0.9
-	light -= HURT_LIGHT_COST
+	light -= cost
 	panic = minf(1.0, panic + 0.55 * Game.panic_gain_scale())
 	velocity += (global_position - from_pos).normalized() * 240.0
 	Sfx.play("hurt")
@@ -172,12 +186,13 @@ func _physics_process(delta: float) -> void:
 		dir = _autopilot_dir(delta)
 		reeling = _auto_reel
 
-	# momentum swimming: constant drag, input acceleration, soft cap
+	# momentum swimming: constant drag, input acceleration, soft cap.
+	# The cap bleeds off gradually so dash bursts genuinely carry speed.
 	velocity *= exp(-DRAG * delta)
 	velocity += dir * ACCEL * delta
 	var max_speed := Game.swim_speed()
 	if velocity.length() > max_speed:
-		velocity = velocity.normalized() * max_speed
+		velocity = velocity.lerp(velocity.normalized() * max_speed, 1.0 - exp(-2.6 * delta))
 
 	if reeling:
 		# pulling the tether: strong steady lift, reduced steering
@@ -195,10 +210,27 @@ func _physics_process(delta: float) -> void:
 		event_message.emit("Dropped %s" % item.get("name", "cargo"))
 		get_parent().spawn_dropped(item, global_position + Vector2(0, 14))
 
+	if Input.is_action_just_pressed("douse"):
+		doused = not doused
+		Sfx.play("douse" if doused else "relight", -6.0)
+		event_message.emit("You kill the light." if doused else "The light returns.")
+
+	for slot in range(2):
+		if Input.is_action_just_pressed("ability_%d" % (slot + 1)):
+			_use_ability(slot)
+	for id in ability_cd:
+		ability_cd[id] = maxf(0.0, ability_cd[id] - delta)
+
+	_update_scan(delta)
+
 	move_and_slide()
 
-	# the Lightline drains; cargo weight dims it faster
-	light -= drain_rate() * delta
+	# the Lightline drains; cargo weight dims it faster.
+	# a doused lamp sips a little less.
+	var drain := drain_rate()
+	if doused:
+		drain *= 0.85
+	light -= drain * delta
 	light_changed.emit(light, Game.max_light())
 
 	# panic creeps in when the light gutters low
@@ -234,6 +266,15 @@ func _animate(dir: Vector2) -> void:
 		lamp.energy = 0.6 + 0.65 * frac / 0.2 + randf_range(-0.18, 0.18)
 	else:
 		lamp.energy = 1.25 + sin(_time * 3.0) * 0.05
+	# doused on purpose, or swallowed by a darkness pocket
+	if doused:
+		lamp.energy *= 0.05
+		glow.energy = 0.12
+	elif dark_pockets > 0:
+		lamp.energy *= 0.16
+		glow.energy = 0.3
+	else:
+		glow.energy = 0.55
 	lamp.color = Color(1.0, lerpf(0.72, 0.94, frac), lerpf(0.5, 0.82, frac))
 	bubbles.emitting = velocity.length() > 26.0 or reeling
 
@@ -242,7 +283,9 @@ func _die() -> void:
 		return
 	dead = true
 	var reason: String
-	if total_weight() > Game.carry_capacity():
+	if strained:
+		reason = "The pressure crushed the light at %dm — the suit wasn't rated for it." % int(depth_m())
+	elif total_weight() > Game.carry_capacity():
 		reason = "Cargo weight exceeded your return budget at %dm." % int(depth_m())
 	elif reeling:
 		reason = "The line went dark on the way up, %dm short of the surface." % int(depth_m())
@@ -255,12 +298,175 @@ func _die() -> void:
 	tween.parallel().tween_property(glow, "energy", 0.05, 1.0)
 	player_died.emit(reason)
 
+# ---------- abilities ----------
+func _use_ability(slot: int) -> void:
+	var id: String = Game.equipped[slot]
+	if id == "" or Game.ability_rank(id) <= 0 or ability_cd.get(id, 0.0) > 0.0:
+		return
+	var rank := Game.ability_rank(id)
+	match id:
+		"sonar":
+			ability_cd[id] = 8.0 if rank == 1 else 6.0
+			light -= 1.5
+			Sfx.play("sonar", -4.0)
+			get_parent().do_sonar(rank)
+		"flare":
+			ability_cd[id] = 6.0
+			light -= 1.0
+			var dir := Vector2(-1.0 if sprite.flip_h else 1.0, -0.4)
+			var flare := Flare.make(global_position + dir * 10.0, dir * 180.0 + velocity * 0.5, rank)
+			get_parent().add_child(flare)
+		"anchor":
+			ability_cd[id] = 0.8
+			get_parent().use_anchor(rank)
+
+## Hold E in light range of a creature to scan it. Risky by design: you have
+## to stay close, and a doused lamp can barely read anything.
+func _update_scan(delta: float) -> void:
+	var scanning := Input.is_action_pressed("interact") or (autopilot and auto_mode == "loot")
+	if not scanning:
+		_reset_scan()
+		return
+	var scan_range := Game.beam_radius() * 0.55
+	if doused:
+		scan_range = 34.0
+	elif dark_pockets > 0:
+		scan_range *= 0.4
+	var target: Node2D = null
+	var best := scan_range
+	for node in get_tree().get_nodes_in_group("scannable"):
+		var creature := node as Node2D
+		if creature == null or not is_instance_valid(creature):
+			continue
+		if Game.has_scan(creature.species):
+			continue
+		var d := global_position.distance_to(creature.global_position)
+		if d < best:
+			best = d
+			target = creature
+	if target == null:
+		_reset_scan()
+		return
+	if target.species != scan_species:
+		scan_species = target.species
+		scan_progress = 0.0
+	scan_progress += delta / 1.6
+	_scan_tick_t -= delta
+	if _scan_tick_t <= 0.0:
+		Sfx.play("scan_tick", -10.0)
+		_scan_tick_t = 0.25
+	if scan_progress >= 1.0:
+		Game.record_scan(scan_species)
+		Sfx.play("scan_done")
+		event_message.emit("%s logged — %s" % [
+			Game.SPECIES[scan_species].title, Game.SPECIES[scan_species].passive])
+		_reset_scan()
+
+func _reset_scan() -> void:
+	scan_species = ""
+	scan_progress = 0.0
+
 # Demo/soak-test autopilot: plays the real loop — seeks pickups (the corpse
 # net first), and reels for the surface when the return budget gets tight.
+# "fight" mode plays a keeper arena: lure the charge across an armed stunner,
+# then dash the exposed weakpoint.
 var _auto_reel := false
+var auto_mode := "loot"
+var _valve_pressed := false
+var _stuck_t := 0.0
+var _unstick_until := 0.0
+var _unstick_dir := Vector2.ZERO
 
 func _autopilot_dir(delta: float) -> Vector2:
+	if auto_mode == "fight":
+		return _autopilot_fight(delta)
+	return _autopilot_loot(delta)
+
+func _autopilot_fight(delta: float) -> Vector2:
 	_auto_drift += delta
+	# blunder out of corners when wedged against geometry
+	_stuck_t = _stuck_t + delta if velocity.length() < 14.0 else 0.0
+	if _unstick_until > 0.0:
+		_unstick_until -= delta
+		return _unstick_dir
+	if _stuck_t > 1.4:
+		_stuck_t = 0.0
+		_unstick_until = 0.6
+		_unstick_dir = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
+		return _unstick_dir
+	if _valve_pressed:
+		Input.action_release("interact")
+		_valve_pressed = false
+	# occasionally ping to exercise sonar in fight tests too
+	if Game.ability_rank("sonar") > 0 and ability_cd.get("sonar", 0.0) <= 0.0:
+		_use_ability(Game.equipped.find("sonar"))
+	var keeper: Node2D = null
+	var keeper_d := 1e12
+	for k in get_tree().get_nodes_in_group("keepers"):
+		var d: float = global_position.distance_to((k as Node2D).global_position)
+		if d < keeper_d:
+			keeper_d = d
+			keeper = k
+	if keeper == null:
+		_auto_reel = true
+		return Vector2(0, -1)
+	if keeper.state == "stunned":
+		var to_boss := (keeper.global_position - global_position)
+		if to_boss.length() < 130.0 and _dash_cd <= 0.0:
+			velocity += to_boss.normalized() * DASH_IMPULSE * 1.2
+			_dash_cd = DASH_COOLDOWN
+		return to_boss.normalized()
+	# find an armed stunner in THIS keeper's arena; if none (bellringer), go
+	# work a valve
+	var prop: Node2D = null
+	var best := 1e9
+	for s in get_tree().get_nodes_in_group("stunners"):
+		if not s.armed:
+			continue
+		if not (keeper as Keeper).arena.grow(80.0).has_point((s as Node2D).global_position):
+			continue
+		var d: float = keeper.global_position.distance_to(s.global_position)
+		if d < best:
+			best = d
+			prop = s
+	if prop == null:
+		var dive := get_parent()
+		if not dive.valves.is_empty():
+			var valve: Node2D = null
+			var vd := 1e12
+			for v in dive.valves:
+				var d: float = global_position.distance_to((v.node as Node2D).position)
+				if d < vd:
+					vd = d
+					valve = v.node
+			var to_valve := valve.position - global_position
+			if to_valve.length() < 32.0:
+				Input.action_press("interact")
+				_valve_pressed = true
+				return Vector2.ZERO
+			return to_valve.normalized()
+		return Vector2(sin(_auto_drift * 2.0), cos(_auto_drift * 1.7)).normalized() * 0.6
+	# hover just past the prop so the charge crosses it
+	var lure_pos: Vector2 = prop.global_position \
+			+ (prop.global_position - keeper.global_position).normalized() * 46.0
+	var to_lure := lure_pos - global_position
+	if to_lure.length() <= 14.0:
+		# the Cantor hunts noise: kick up a burst right here by the pipe
+		if Keeper.CONFIG[keeper.id].target == "noise" and keeper.state == "idle" \
+				and _dash_cd <= 0.0:
+			velocity += (global_position - keeper.global_position).normalized() * DASH_IMPULSE
+			_dash_cd = DASH_COOLDOWN
+		return Vector2.ZERO
+	return to_lure.normalized()
+
+func _autopilot_loot(delta: float) -> Vector2:
+	_auto_drift += delta
+	if Game.ability_rank("sonar") > 0 and ability_cd.get("sonar", 0.0) <= 0.0 \
+			and depth_m() > 30.0 and "sonar" in Game.equipped:
+		_use_ability(Game.equipped.find("sonar"))
+	# don't dive below the suit rating (greedy mode ignores even this)
+	if not Game.greedy and global_position.y > get_parent().rated_max_y - 100.0:
+		_auto_reel = true
 	# bank when the margin closes (greedy mode never turns back, on purpose)
 	if Game.greedy:
 		_auto_reel = false
@@ -278,6 +484,8 @@ func _autopilot_dir(delta: float) -> Vector2:
 			if p == null or not is_instance_valid(p):
 				continue
 			var d := global_position.distance_to(p.global_position)
+			if p.is_in_group("logs"):
+				d *= 0.35  # a recording is worth a detour
 			if d < best:
 				best = d
 				target = p

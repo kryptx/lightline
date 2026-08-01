@@ -65,8 +65,60 @@ func _init() -> void:
 	check(game.pending_net.is_empty(), "no net when nothing carried")
 	check(game.last_result.salvage == 3, "minimum stipend 3")
 
+	print("-- keepers & suits --")
+	check(not game.can_buy_suit(2), "suit II blocked without core")
+	game.record_keeper(1)
+	check(game.cores.has(1), "core 1 held after keeper 1")
+	check(game.keeper_defeated(1), "keeper 1 marked dead")
+	var relics_before = game.relics
+	game.record_keeper(1)
+	check(game.relics == relics_before, "keeper kill only counts once")
+	game.relics = 4
+	check(game.can_buy_suit(2), "suit II purchasable with core + 4 relics")
+	check(not game.can_buy_suit(3), "cannot skip to suit III")
+	check(game.buy_suit(2), "suit II fitted")
+	check(game.suit_tier == 2 and game.relics == 0, "relics spent on suit")
+
+	print("-- abilities --")
+	game.relics = 3
+	check(game.ability_cost("sonar") == 3, "sonar rank 1 costs 3")
+	check(game.buy_ability("sonar"), "sonar learned")
+	check(game.equipped[0] == "sonar", "first ability auto-equips to Q")
+	check(not game.can_buy_ability("sonar"), "cannot afford rank 2")
+	game.relics = 10
+	check(game.buy_ability("flare"), "flare learned")
+	check(game.equipped[1] == "flare", "second ability auto-equips to R")
+	game.equip_ability("flare", 0)
+	check(game.equipped[0] == "flare" and game.equipped[1] == "", "re-equip moves slot")
+
+	print("-- bestiary --")
+	check(game.record_scan("lanternjaw"), "first scan recorded")
+	check(not game.record_scan("lanternjaw"), "second scan is a no-op")
+	check(game.has_scan("lanternjaw"), "scan queryable")
+	var base_speed = 200.0 + 13.0 * game.stats.fins
+	game.record_scan("fish_teal")
+	check(absf(game.swim_speed() - base_speed * 1.08) < 0.01, "glimmerfin passive applies")
+
+	print("-- logs --")
+	check(game.next_log_for_band(1) == 1, "band 1 starts at log 1")
+	game.record_log(1)
+	game.record_log(1)
+	check(game.logs_found == [1], "log dedup")
+	check(game.next_log_for_band(1) == 2, "band 1 advances to log 2")
+	check(game.next_log_for_band(3) == 12, "band 3 starts at log 12")
+	for id in [12, 13, 14, 15]:
+		game.record_log(id)
+	check(game.next_log_for_band(3) == -1, "band 3 exhausts")
+
 	print("-- hint --")
 	check(game.next_goal_hint().length() > 10, "hint is a sentence")
+	game.relics = 0
+	game.suit_tier = 1
+	game.keepers_defeated = []
+	game.cores = []
+	check("guards the floor" in game.next_goal_hint(), "hint points at the keeper")
+	game.cores = [1]
+	check("core" in game.next_goal_hint(), "hint points at held core")
 
 	if failures == 0:
 		print("ALL PASS")

@@ -2,7 +2,10 @@ class_name Urchin
 extends Area2D
 ## Static hazard: brushing it costs light and spikes panic.
 
+var species := "urchin"
+
 func _ready() -> void:
+	add_to_group("scannable")
 	collision_layer = 0
 	collision_mask = 2
 	var shape := CollisionShape2D.new()
@@ -16,4 +19,4 @@ func _ready() -> void:
 
 func _on_body(body: Node2D) -> void:
 	if body is Player:
-		(body as Player).hurt(global_position)
+		(body as Player).hurt(global_position, 6.0, species)

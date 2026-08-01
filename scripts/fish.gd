@@ -3,22 +3,25 @@ extends Node2D
 ## Passive Band 1 fauna: drifts around its home point, flees the diver a little.
 
 var home := Vector2.ZERO
+var species := "fish_teal"
 var _target := Vector2.ZERO
 var _speed := 40.0
 var _vel := Vector2.ZERO
 var _timer := 0.0
 var sprite: AnimatedSprite2D
 
-static func make(species: String, at: Vector2) -> Fish:
+static func make(kind: String, at: Vector2) -> Fish:
 	var f := Fish.new()
 	f.position = at
 	f.home = at
-	f.sprite = Sprites.animated("res://assets/%s.png" % species, 4, 7.0)
+	f.species = kind
+	f.sprite = Sprites.animated("res://assets/%s.png" % kind, 4, 7.0)
 	f.add_child(f.sprite)
 	f._speed = randf_range(30.0, 55.0)
 	return f
 
 func _ready() -> void:
+	add_to_group("scannable")
 	z_index = 4
 	_pick_target()
 
