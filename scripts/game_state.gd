@@ -443,6 +443,9 @@ func _int_array(raw) -> Array:
 func _parse_args() -> void:
 	if not OS.get_cmdline_user_args().is_empty():
 		save_path = DEV_SAVE_PATH
+		# dev/test runs stay windowed so screenshots keep a fixed resolution
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		DisplayServer.window_set_size(Vector2i(1280, 720))
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--autodive":
 			autoplay = true

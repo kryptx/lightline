@@ -180,6 +180,16 @@ func _build_panel() -> void:
 	dive_button.pressed.connect(_start_dive)
 	box.add_child(dive_button)
 
+	var quit_button := Button.new()
+	quit_button.text = "Quit to shore"
+	quit_button.flat = true
+	quit_button.add_theme_font_size_override("font_size", 12)
+	quit_button.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	quit_button.pressed.connect(func() -> void:
+		Sfx.play("ui")
+		get_tree().quit())
+	box.add_child(quit_button)
+
 func _stat_row(stat: String) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
