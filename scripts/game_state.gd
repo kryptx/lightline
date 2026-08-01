@@ -459,6 +459,12 @@ func _parse_args() -> void:
 			spawn_depth_m = float(arg.trim_prefix("--spawn-depth="))
 		elif arg == "--scan-all":  # debug
 			_post_load_overrides.append(func() -> void: bestiary = SPECIES_ORDER.duplicate())
+		elif arg.begins_with("--logs="):  # debug: --logs=1,2,7
+			var ids := arg.trim_prefix("--logs=").split(",")
+			_post_load_overrides.append(func() -> void:
+				for id in ids:
+					if not logs_found.has(int(id)):
+						logs_found.append(int(id)))
 		elif arg.begins_with("--test-keeper="):  # debug: autopilot fights keeper N
 			test_keeper = int(arg.trim_prefix("--test-keeper="))
 		elif arg.begins_with("--test-finale="):  # debug: relight | cut | descend

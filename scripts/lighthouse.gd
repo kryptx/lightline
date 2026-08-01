@@ -13,7 +13,6 @@ var respec_button: Button
 var lamp_glow: TextureRect
 var gear_box: VBoxContainer
 var archive_box: VBoxContainer
-var log_reader: Label
 var _time := 0.0
 
 func _ready() -> void:
@@ -397,24 +396,28 @@ func _rebuild_archive() -> void:
 			row.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
 
 	archive_box.add_child(HSeparator.new())
-	_label(archive_box, 15, Color(0.9, 0.9, 0.95)).text = "MARLOWE'S LOGS — %d / 15" % Game.logs_found.size()
-	for id in range(1, 16):
+	_label(archive_box, 15, Color(0.9, 0.9, 0.95)).text = "MARLOWE'S LOGS — %d / %d" % [
+		Game.logs_found.size(), Logs.ENTRIES.size()]
+	for id in range(1, Logs.ENTRIES.size() + 1):
 		if Game.logs_found.has(id):
+			var title: String = Logs.ENTRIES[id].title
 			var btn := Button.new()
-			btn.text = "▶ " + Logs.ENTRIES[id].title
+			btn.text = "▶ " + title
 			btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			btn.add_theme_font_size_override("font_size", 12)
-			btn.pressed.connect(func() -> void:
-				Sfx.play("log", -6.0)
-				log_reader.text = "%s\n\n%s" % [Logs.ENTRIES[id].title, Logs.ENTRIES[id].text]
-				log_reader.visible = true)
 			archive_box.add_child(btn)
+			# the recording expands in place, right under its title
+			var body := _label(archive_box, 12, Color(0.85, 0.9, 0.9))
+			body.text = Logs.ENTRIES[id].text
+			body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			body.visible = false
+			btn.pressed.connect(func() -> void:
+				body.visible = not body.visible
+				btn.text = ("▼ " if body.visible else "▶ ") + title
+				Sfx.play("ui", -4.0))
 		else:
 			var row := _label(archive_box, 12, Color(1, 1, 1, 0.35))
 			row.text = "— Log %02d — static —" % id
-	log_reader = _label(archive_box, 12, Color(0.85, 0.9, 0.9))
-	log_reader.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	log_reader.visible = false
 
 # ---------- ledger ----------
 func _build_ledger() -> void:

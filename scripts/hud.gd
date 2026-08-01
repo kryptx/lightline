@@ -207,52 +207,46 @@ func _build_ability_slots() -> void:
 		panel.add_child(rank)
 		ability_slots.append({"panel": panel, "icon": icon, "cd": cd_rect, "rank": rank})
 
+## A small corner toast — never over the action; the Archive is for reading.
 func _build_log_panel() -> void:
 	log_panel = PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.03, 0.05, 0.10, 0.92)
+	style.bg_color = Color(0.03, 0.05, 0.10, 0.9)
 	style.border_color = Color(0.5, 0.95, 0.85, 0.5)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(6)
-	style.set_content_margin_all(14)
+	style.set_content_margin_all(10)
 	log_panel.add_theme_stylebox_override("panel", style)
-	log_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	log_panel.anchor_top = 1.0
-	log_panel.anchor_bottom = 1.0
-	log_panel.anchor_left = 0.5
-	log_panel.anchor_right = 0.5
-	log_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	log_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	log_panel.position = Vector2(-330, -230)
-	log_panel.custom_minimum_size = Vector2(660, 0)
+	log_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	log_panel.anchor_left = 1.0
+	log_panel.anchor_right = 1.0
+	log_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	log_panel.position = Vector2(-336, 14)
+	log_panel.custom_minimum_size = Vector2(320, 0)
 	log_panel.visible = false
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 3)
 	log_panel.add_child(box)
 	log_title = Label.new()
-	log_title.add_theme_font_size_override("font_size", 16)
+	log_title.add_theme_font_size_override("font_size", 13)
 	log_title.add_theme_color_override("font_color", Color(0.5, 0.95, 0.85))
+	log_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(log_title)
 	log_text = Label.new()
-	log_text.add_theme_font_size_override("font_size", 13)
+	log_text.add_theme_font_size_override("font_size", 11)
+	log_text.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
+	log_text.text = "Recording archived — play it back at the lighthouse."
 	log_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(log_text)
-	var dismiss := Label.new()
-	dismiss.text = "— recording ends —"
-	dismiss.add_theme_font_size_override("font_size", 11)
-	dismiss.add_theme_color_override("font_color", Color(1, 1, 1, 0.4))
-	box.add_child(dismiss)
 	add_child(log_panel)
 
 func show_log(id: int) -> void:
-	var entry: Dictionary = Logs.ENTRIES[id]
-	log_title.text = entry.title
-	log_text.text = entry.text
+	log_title.text = "⏺ " + Logs.ENTRIES[id].title
 	log_panel.visible = true
 	log_panel.modulate.a = 1.0
 	var tween := create_tween()
-	tween.tween_interval(11.0)
-	tween.tween_property(log_panel, "modulate:a", 0.0, 1.5)
+	tween.tween_interval(5.0)
+	tween.tween_property(log_panel, "modulate:a", 0.0, 1.2)
 	tween.tween_callback(func() -> void: log_panel.visible = false)
 
 func show_band_splash(band_name: String) -> void:
