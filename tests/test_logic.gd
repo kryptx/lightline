@@ -15,6 +15,7 @@ func _init() -> void:
 	# Game autoload isn't up when -s runs; instance it manually.
 	var game = load("res://scripts/game_state.gd").new()
 	game._fresh = true
+	game.save_path = game.DEV_SAVE_PATH  # never let tests touch real progress
 	game.name = "Game"
 	root.add_child(game)
 

@@ -2,6 +2,11 @@ extends Node
 ## Persistent game state: stats, currencies, corpse net, save/load.
 
 const SAVE_PATH := "user://save.json"
+const DEV_SAVE_PATH := "user://save_dev.json"
+## Any run with command-line user args (test bots, screenshots, debug flags)
+## is a dev run and gets its own save file — it must never touch real
+## player progress.
+var save_path := SAVE_PATH
 const PX_PER_M := 8.0
 
 const STAT_ORDER := ["lungs", "beam", "grip", "fins", "nerve"]
@@ -378,14 +383,14 @@ func save_game() -> void:
 		"last_ending": last_ending,
 		"settings": settings,
 	}
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(data, "\t"))
 
 func load_game() -> void:
-	if _fresh or not FileAccess.file_exists(SAVE_PATH):
+	if _fresh or not FileAccess.file_exists(save_path):
 		return
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var file := FileAccess.open(save_path, FileAccess.READ)
 	if file == null:
 		return
 	var parsed = JSON.parse_string(file.get_as_text())
@@ -436,6 +441,8 @@ func _int_array(raw) -> Array:
 
 # ---------- input & args ----------
 func _parse_args() -> void:
+	if not OS.get_cmdline_user_args().is_empty():
+		save_path = DEV_SAVE_PATH
 	for arg in OS.get_cmdline_user_args():
 		if arg == "--autodive":
 			autoplay = true
@@ -482,8 +489,8 @@ func _parse_args() -> void:
 					equipped[1] = parts[0])
 		elif arg == "--fresh":
 			_fresh = true
-			if FileAccess.file_exists(SAVE_PATH):
-				DirAccess.remove_absolute(SAVE_PATH)
+			if FileAccess.file_exists(save_path):
+				DirAccess.remove_absolute(save_path)
 
 func _setup_input() -> void:
 	_action("move_left", [KEY_A, KEY_LEFT], JOY_AXIS_LEFT_X, -1.0)
